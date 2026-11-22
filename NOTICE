@@ -1,0 +1,67 @@
+Robot Vault core
+Copyright (c) 2026 Ingotron
+
+This product is free software. You can use, change and share it under the
+terms of the GNU Affero General Public License, version 3 only. The full text
+is in the file LICENSE. The names "Robot Vault" and "Ingotron" and their logos
+are not covered by that licence (see TRADEMARKS.md).
+
+Contact: hello@ingotron.com
+
+Third-party software
+--------------------
+This product includes software written by other people. Each component stays
+under its own licence. The licence names, the places where the full licence
+texts are, the source locations and the written offer for source code are in
+THIRD_PARTY_NOTICES.md. The licence texts that the licences require are also
+inside the container images (see THIRD_PARTY_NOTICES.md for the paths).
+
+Notices that the licences of third-party components ask us to repeat
+--------------------------------------------------------------------
+
+Apache ECharts (Apache-2.0)
+  Copyright 2017-2026 The Apache Software Foundation
+  This product includes software developed at
+  The Apache Software Foundation (https://www.apache.org/).
+
+ZRender (BSD-3-Clause), the rendering engine of Apache ECharts
+  Copyright (c) 2017, Baidu Inc. All rights reserved.
+
+Instrument Sans (SIL Open Font License 1.1)
+  Copyright 2022 The Instrument Sans Project Authors
+  (https://github.com/Instrument/instrument-sans)
+
+IBM Plex Mono (SIL Open Font License 1.1)
+  Copyright 2017 IBM Corp. All rights reserved.
+
+  The fonts are used unmodified. The licence texts are served with the web
+  application at /ui/licenses/instrument-sans-OFL-1.1.txt and
+  /ui/licenses/ibm-plex-mono-OFL-1.1.txt.
+
+Lucide icons (ISC)
+  Copyright (c) for portions of Lucide are held by Cole Bemis 2013-2022 as part
+  of Feather (MIT). All other copyright (c) for Lucide are held by Lucide
+  Contributors 2022. The licence text is served at /ui/licenses/lucide-ISC.txt.
+
+rclone (MIT)
+  Copyright (C) 2012 by Nick Craig-Wood http://www.craig-wood.com/nick/
+  rclone is in the robot-vault-toolkit image, unmodified. Its licence text is
+  at /usr/share/licenses/rclone/COPYING in that image.
+
+RustFS (Apache-2.0)
+  RustFS is in the robot-vault-objectstore image, unchanged except for two
+  upgraded OpenSSL packages (https://github.com/rustfs/rustfs). Its licence text
+  is at /usr/share/licenses/rustfs/LICENSE in that image.
+
+Example data (the folder examples/)
+  Technical University of Munich, Computer Vision Group, TUM RGB-D Benchmark,
+  sequence fr2/pioneer_slam2, CC BY 4.0
+  (https://creativecommons.org/licenses/by/4.0/). The bags "wheeled-nominal"
+  and "imperfect-run" are changed derivatives of an excerpt of this sequence.
+
+  LeRobot aloha_static_coffee dataset (ALOHA; Tony Zhao, Vikash Kumar, Sergey
+  Levine and Chelsea Finn), MIT License. The bag "manipulator-pickplace" is
+  derived from it.
+
+  The bag "pii-bearing" uses only synthetic material made for this project
+  (see examples/assets/ASSET_PROVENANCE.md).

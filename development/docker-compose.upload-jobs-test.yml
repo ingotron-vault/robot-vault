@@ -1,0 +1,8 @@
+services:
+  dev:
+    # Replace the normal recording bind with disposable in-memory storage.
+    # Compose resolves this relative source against the root compose file.
+    volumes: !override
+      - .:/app
+      - type: tmpfs
+        target: /tmp/robot_data

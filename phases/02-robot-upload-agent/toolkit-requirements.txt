@@ -1,0 +1,16 @@
+# Floors for the core toolkit image (deploy/release-images/toolkit.Dockerfile).
+# Only what its jobs import: db.migrate, release.bootstrap_postgres_roles,
+# tools.s3_gc (gc), the robot console (robot_upload_agent.web), rsm / rua and
+# the generated gRPC stubs (grpcio-tools runs protoc at build time).
+# NOT here: Pillow, rosbags, numpy, mcap.
+# Lock: `make lock-python-toolkit` -> toolkit.lock.txt (same versions as the dev lock).
+grpcio>=1.62
+grpcio-tools>=1.62
+protobuf>=4.25
+fastapi>=0.110
+uvicorn[standard]>=0.29
+prometheus-client>=0.20
+psycopg[binary]>=3.2
+boto3>=1.34
+pyyaml>=6
+psutil>=5.9

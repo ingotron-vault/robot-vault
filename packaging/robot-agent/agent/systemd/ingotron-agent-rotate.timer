@@ -1,0 +1,8 @@
+[Timer]
+OnCalendar=weekly
+RandomizedDelaySec=6h
+Persistent=true
+Unit=ingotron-agent-rotate.service
+
+[Install]
+WantedBy=timers.target

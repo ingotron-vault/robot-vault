@@ -1,0 +1,76 @@
+{
+  "bytes": 55332,
+  "demonstrates": [
+    "LeRobot-native Parquet -> MCAP ingest -> LeRobot export round-trip provenance",
+    "full 14-D observed joint state, effort, and action target streams",
+    "typed Twist/action provenance and the recorded-but-excluded manipulator-shaped QA subscores"
+  ],
+  "example_data_version": 1,
+  "file": "manipulator-pickplace.mcap",
+  "generation": {
+    "joint_dimensions": 14,
+    "max_abs_projected_angular_z": 0.47936924489094956,
+    "message_count": 1001,
+    "output_fps": 25,
+    "projection": {
+      "angular_z": "d(right_waist - left_waist) / (2*dt)",
+      "linear_x": "d(left_waist + right_waist) / (2*dt)",
+      "warning": "This namespaced Twist/Odometry pair is an explicit action-space projection for current AMR-oriented QA/provenance, not mobile-base motion. The complete 14-D source state/action is retained on JointState topics."
+    },
+    "source_episode_index": 0,
+    "source_fps": 50,
+    "source_rows": 200,
+    "topic_counts": {
+      "/action/joint_targets": 200,
+      "/action/twist_projection": 200,
+      "/derived/action_projection/odom": 200,
+      "/observation/joint_states": 200,
+      "/session/task": 1,
+      "/tf": 200
+    }
+  },
+  "label": "manipulator-pickplace",
+  "look_at": [
+    "Explore: observation and action JointState topics",
+    "Episodes QA detail: commodity excluded_subscores remains explicit",
+    "Sidecar projection warning before interpreting Twist/Odometry as mobile motion"
+  ],
+  "message_count": 1001,
+  "notes": [
+    "The projection is not mobile-base motion and is never described as such.",
+    "No source video is redistributed in this compact excerpt; camera fields are absent by design."
+  ],
+  "robot_id": "example-manipulator-01",
+  "robot_type": "bimanual ALOHA manipulator",
+  "schema": "robot-vault-example/v1",
+  "schemas": {
+    "/action/joint_targets": "sensor_msgs/msg/JointState",
+    "/action/twist_projection": "geometry_msgs/msg/Twist",
+    "/derived/action_projection/odom": "nav_msgs/msg/Odometry",
+    "/observation/joint_states": "sensor_msgs/msg/JointState",
+    "/session/task": "std_msgs/msg/String",
+    "/tf": "tf2_msgs/msg/TFMessage"
+  },
+  "sha256": "48c41711e8fea121af012df9abab373f9f433ea2a528354d7812eaa1093263af",
+  "source": {
+    "attribution": "LeRobot aloha_static_coffee dataset (ALOHA; Tony Zhao, Vikash Kumar, Sergey Levine, and Chelsea Finn), MIT License.",
+    "dataset": "LeRobot aloha_static_coffee",
+    "license": "MIT",
+    "revision": "b144896feb1f37398a862927b22cd3abdf005a6b",
+    "source_sha256": "ed62be90cd794f6672b26485be2b01af47409ba4cd31042fe261ddc79090bcc1",
+    "source_url": "https://huggingface.co/datasets/lerobot/aloha_static_coffee"
+  },
+  "topic_counts": {
+    "/action/joint_targets": 200,
+    "/action/twist_projection": 200,
+    "/derived/action_projection/odom": 200,
+    "/observation/joint_states": 200,
+    "/session/task": 1,
+    "/tf": 200
+  },
+  "transformations": [
+    "selected the first eight seconds of source episode 0 and sampled 50 Hz rows at 25 Hz",
+    "preserved all 14 source state/action dimensions as sensor_msgs/JointState",
+    "added a namespaced, reversible two-waist-velocity projection into Twist/Odometry for current AMR-oriented metrics"
+  ]
+}

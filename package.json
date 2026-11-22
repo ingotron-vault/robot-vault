@@ -1,0 +1,17 @@
+{
+  "name": "robot-vault",
+  "private": true,
+  "workspaces": [
+    "phases/ui-kit",
+    "phases/05-query-service/src/ui-spa",
+    "phases/02-robot-upload-agent/src/ui-spa"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present"
+  },
+  "engines": {
+    "node": ">=20.19.0"
+  }
+}

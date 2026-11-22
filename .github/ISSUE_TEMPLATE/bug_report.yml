@@ -1,0 +1,36 @@
+name: Bug report
+description: Something does not work as the documentation says.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not report security problems here. See SECURITY.md.
+        Do not paste credentials or real customer recordings.
+  - type: input
+    id: version
+    attributes:
+      label: Version or image digest
+      description: Release tag, commit, or `robot-vault-core-*` image digest.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Exact commands and inputs.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happened
+      description: Include log lines and the output of `curl -fsS http://localhost:8003/api/v1/edition`.
+    validations:
+      required: true

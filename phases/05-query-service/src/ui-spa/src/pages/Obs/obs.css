@@ -1,0 +1,414 @@
+/*
+ * Observability (route /obs) — Prometheus telemetry.
+ *
+ * Order: page header, the telemetry-window filter bar (the Episodes filter
+ * idiom), the chart grid (two columns from 1120px), then the PromQL explorer
+ * beside Active alerts. A chart without samples shows one calm line instead
+ * of bare axes. Semantic tokens only; no gradients, glow, blur, or
+ * decorative shadows.
+ */
+
+.rv-obs {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rv-space-5);
+  min-width: 0;
+  color: var(--rv-text);
+  font-family: var(--rv-font-sans);
+}
+
+.rv-obs *,
+.rv-obs *::before,
+.rv-obs *::after {
+  box-sizing: border-box;
+}
+
+.rv-obs button,
+.rv-obs input,
+.rv-obs select {
+  font: inherit;
+}
+
+.rv-obs :focus-visible {
+  outline: 2px solid var(--rv-accent);
+  outline-offset: 2px;
+}
+
+/* ---- filter bar -------------------------------------------------------- */
+
+.rv-obs-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 14px;
+  padding: var(--rv-space-4);
+  border: 1px solid var(--rv-line);
+  border-radius: var(--radius-lg);
+  background: var(--rv-surface);
+}
+
+.rv-obs-field {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.rv-obs-field.is-range { flex: 1 1 130px; }
+.rv-obs-field.is-step { flex: 1 1 100px; }
+.rv-obs-field.is-regex { flex: 2 1 180px; }
+.rv-obs-field.is-top { flex: 1 1 88px; }
+
+.rv-obs-field > span {
+  color: var(--rv-muted);
+  font-size: var(--rv-type-caption);
+  font-weight: var(--rv-weight-medium);
+  line-height: var(--rv-leading-caption);
+}
+
+.rv-obs-field input,
+.rv-obs-field select,
+.rv-obs-prom-controls input {
+  width: 100%;
+  min-width: 0;
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--rv-control-border);
+  border-radius: var(--radius-md);
+  background: var(--rv-control-bg);
+  color: var(--rv-text);
+  font-size: var(--rv-type-ui);
+  line-height: var(--rv-leading-ui);
+  transition: border-color 140ms ease;
+}
+
+.rv-obs-field input.is-mono,
+.rv-obs-prom-controls input {
+  font-family: var(--rv-font-mono);
+}
+
+.rv-obs-field input:hover,
+.rv-obs-field select:hover,
+.rv-obs-prom-controls input:hover {
+  border-color: var(--rv-dim);
+}
+
+.rv-obs-field input::placeholder {
+  color: var(--rv-dim);
+}
+
+.rv-obs-actions {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--rv-space-2);
+  margin-left: auto;
+}
+
+.rv-obs-button,
+.rv-obs-auto {
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--rv-space-2);
+  padding: 0 14px;
+  border: 1px solid var(--rv-control-border);
+  border-radius: var(--radius-md);
+  background: var(--rv-control-bg);
+  color: var(--rv-text);
+  font-size: var(--rv-type-ui);
+  font-weight: var(--rv-weight-medium);
+  line-height: var(--rv-leading-ui);
+  white-space: nowrap;
+  transition: border-color 140ms ease, background-color 140ms ease, color 140ms ease;
+}
+
+.rv-obs-button {
+  cursor: pointer;
+}
+
+.rv-obs-button:hover {
+  border-color: var(--rv-dim);
+  background: var(--rv-control-hover);
+}
+
+.rv-obs-button.is-primary {
+  border-color: var(--rv-accent);
+  background: var(--rv-accent);
+  color: var(--rv-on-accent);
+  font-weight: var(--rv-weight-semibold);
+}
+
+.rv-obs-button.is-primary:hover {
+  border-color: var(--rv-accent-hover);
+  background: var(--rv-accent-hover);
+}
+
+.rv-obs-auto {
+  color: var(--rv-muted);
+  cursor: pointer;
+}
+
+.rv-obs-auto input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--rv-accent);
+}
+
+/* ---- panels ------------------------------------------------------------ */
+
+.rv-obs-panel {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.rv-obs-panel-heading {
+  flex-wrap: wrap;
+  padding: var(--rv-space-4);
+  border-bottom: 1px solid var(--rv-line);
+}
+
+.rv-obs-panel-heading h2 {
+  margin-top: 2px;
+}
+
+.rv-obs-panel-note {
+  color: var(--rv-dim);
+  font-family: var(--rv-font-mono);
+  font-size: var(--rv-type-caption);
+  line-height: var(--rv-leading-caption);
+  white-space: nowrap;
+}
+
+.rv-obs-panel-body {
+  display: grid;
+  gap: var(--rv-space-2);
+  padding: var(--rv-space-4) var(--rv-space-4) 0;
+}
+
+.rv-obs-chart-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: stretch;
+  gap: var(--rv-space-5);
+}
+
+.rv-obs-chart-body {
+  min-width: 0;
+  padding: var(--rv-space-2) var(--rv-space-4) var(--rv-space-3);
+}
+
+/* The chart's own data disclosure sits under the plot as a quiet footer. */
+.rv-obs-chart-body .rv-chart__data {
+  margin-top: var(--rv-space-1);
+}
+
+.rv-obs-chart-empty {
+  margin: var(--rv-space-4);
+  padding: var(--rv-space-5) var(--rv-space-4);
+  border: 1px dashed var(--rv-line-strong);
+  border-radius: var(--radius-md);
+  color: var(--rv-muted);
+  font-size: var(--rv-type-body);
+  line-height: var(--rv-leading-body);
+  text-align: center;
+}
+
+.rv-obs-chart-empty.is-error {
+  border-color: var(--rv-red-line);
+  color: var(--rv-red);
+}
+
+.rv-obs-lower-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: stretch;
+  gap: var(--rv-space-5);
+}
+
+.rv-obs-prom-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: var(--rv-space-2);
+}
+
+.rv-obs-prom-error {
+  margin: 0;
+  color: var(--rv-red);
+  font-size: var(--rv-type-ui);
+  line-height: var(--rv-leading-ui);
+}
+
+/* ---- alerts ------------------------------------------------------------ */
+
+.rv-obs-alert-list {
+  display: grid;
+}
+
+.rv-obs-alert-list article {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: var(--rv-space-3);
+  padding: var(--rv-space-3) var(--rv-space-4);
+  border-bottom: 1px solid var(--rv-line);
+}
+
+.rv-obs-alert-list article:last-child {
+  border-bottom: 0;
+}
+
+.rv-obs-alert-list article > span {
+  min-height: 22px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 var(--rv-space-2);
+  border: 1px solid var(--rv-line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--rv-surface-subtle);
+  color: var(--rv-muted);
+  font-family: var(--rv-font-mono);
+  font-size: var(--rv-type-caption);
+  font-weight: var(--rv-weight-medium);
+  letter-spacing: var(--rv-tracking-label);
+  line-height: var(--rv-leading-caption);
+  text-transform: uppercase;
+}
+
+.rv-obs-alert-list article > span.is-critical,
+.rv-obs-alert-list article > span.is-error {
+  border-color: var(--rv-red-line);
+  background: var(--rv-red-soft);
+  color: var(--rv-red);
+}
+
+.rv-obs-alert-list article > span.is-warning {
+  border-color: var(--rv-amber-line);
+  background: var(--rv-amber-soft);
+  color: var(--rv-amber);
+}
+
+.rv-obs-alert-list b {
+  font-size: var(--rv-type-body);
+  font-weight: var(--rv-weight-semibold);
+  line-height: var(--rv-leading-body);
+  overflow-wrap: anywhere;
+}
+
+.rv-obs-alert-list p {
+  margin: 2px 0 0;
+  color: var(--rv-muted);
+  font-size: var(--rv-type-body);
+  line-height: var(--rv-leading-body);
+}
+
+.rv-obs-empty {
+  flex: 1;
+  min-height: 160px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: var(--rv-space-2);
+  padding: var(--rv-space-5) var(--rv-space-4);
+  color: var(--rv-muted);
+  font-size: var(--rv-type-body);
+  line-height: var(--rv-leading-body);
+  text-align: center;
+}
+
+.rv-obs-empty span {
+  min-height: 22px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 var(--rv-space-2);
+  border: 1px solid var(--rv-green-line);
+  border-radius: var(--radius-sm);
+  background: var(--rv-green-soft);
+  color: var(--rv-green);
+  font-size: var(--rv-type-caption);
+  font-weight: var(--rv-weight-medium);
+  line-height: var(--rv-leading-caption);
+}
+
+.rv-obs-empty span i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.rv-obs-empty span.is-checking {
+  border-color: var(--rv-line-strong);
+  background: var(--rv-surface-raised);
+  color: var(--rv-muted);
+}
+
+.rv-obs-empty span.is-unavailable {
+  border-color: var(--rv-red-line);
+  background: var(--rv-red-soft);
+  color: var(--rv-red);
+}
+
+.rv-obs-empty p {
+  margin: 0;
+}
+
+/* ---- responsive -------------------------------------------------------- */
+
+@media (min-width: 1120px) {
+  .rv-obs-chart-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .rv-obs-chart.is-wide {
+    grid-column: 1 / -1;
+  }
+
+  .rv-obs-lower-grid {
+    grid-template-columns: minmax(0, 1.6fr) minmax(300px, 1fr);
+  }
+}
+
+@media (max-width: 700px) {
+  .rv-obs-filter-bar {
+    padding: 14px;
+  }
+
+  .rv-obs-actions {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .rv-obs-actions > * {
+    flex: 1 1 0;
+    min-height: 44px;
+  }
+
+  .rv-obs-field input,
+  .rv-obs-field select,
+  .rv-obs-prom-controls input {
+    min-height: 44px;
+  }
+
+  .rv-obs-prom-controls {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .rv-obs-prom-controls input {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rv-obs-field input,
+  .rv-obs-field select,
+  .rv-obs-button,
+  .rv-obs-auto {
+    transition: none;
+  }
+}

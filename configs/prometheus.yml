@@ -1,0 +1,30 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: 'ingest'
+    static_configs:
+      - targets: ['robot-vault-ingest:8080']
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+
+  - job_name: 'query'
+    static_configs:
+      - targets: ['robot-vault-query:8003']
+    metrics_path: '/metrics'
+
+  - job_name: 'processor'
+    static_configs:
+      - targets: ['robot-vault-processor:8000']
+    metrics_path: '/metrics'
+
+  - job_name: 'gc'
+    static_configs:
+      - targets: ['robot-vault-gc:9108']
+
+  # The Pro exporter; absent in core, so this target stays down there.
+  - job_name: 'exporter'
+    static_configs:
+      - targets: ['robot-vault-exporter:8001']
+
+

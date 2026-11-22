@@ -1,0 +1,43 @@
+# Rotation must be able to WRITE the new token, so /etc/ingotron/credentials is listed in
+# ReadWritePaths even though /etc/ingotron as a whole is in ReadOnlyPaths: systemd's namespace
+# setup applies ReadWritePaths after ReadOnlyPaths, so a ReadWritePaths entry for a subtree wins
+# over the ReadOnlyPaths of its parent directory.
+[Unit]
+Description=Robot Vault credential rotation
+Documentation=https://docs.ingotron.com/robot
+After=network-online.target
+Wants=network-online.target
+ConditionPathExists=/etc/ingotron/credentials/robot.token
+
+[Service]
+Type=oneshot
+User=ingotron
+Group=ingotron
+ExecStart=/opt/ingotron-agent/current/bin/ingotron-agent credential rotate --if-older-than 90d
+WorkingDirectory=/var/lib/ingotron
+EnvironmentFile=-/etc/ingotron/agent.env
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ingotron-agent-rotate
+UMask=0077
+
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadOnlyPaths=/etc/ingotron
+ReadWritePaths=/var/lib/ingotron /etc/ingotron/credentials
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources
+CapabilityBoundingSet=

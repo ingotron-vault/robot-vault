@@ -1,0 +1,637 @@
+/*
+ * Orbit shell: a fixed 248px sidebar beside the page workspace on desktop.
+ * At 1120px and below the sidebar becomes a static top bar: brand and
+ * utilities on the first row, one horizontally scrollable navigation row
+ * below. The pipeline order (Intake, Explore, Review, Verification) and the
+ * edition gate are the same in both layouts.
+ */
+.rv-shell {
+  min-height: 100vh;
+  color: var(--rv-text);
+  background: var(--rv-bg);
+  font-family: var(--rv-font-sans);
+}
+
+.rv-shell *,
+.rv-shell *::before,
+.rv-shell *::after {
+  box-sizing: border-box;
+}
+
+.rv-shell button,
+.rv-shell input,
+.rv-shell select,
+.rv-shell textarea {
+  font: inherit;
+}
+
+.rv-shell code,
+.rv-shell kbd,
+.rv-shell pre {
+  font-family: var(--rv-font-mono);
+}
+
+.rv-shell__skip-link {
+  position: fixed;
+  inset-block-start: 8px;
+  inset-inline-start: 8px;
+  z-index: 100;
+  padding: 9px 12px;
+  border: 1px solid var(--rv-accent-line);
+  border-radius: 6px;
+  color: var(--rv-on-accent);
+  background: var(--rv-accent);
+  font-weight: var(--rv-weight-semibold);
+  text-decoration: none;
+  transform: translateY(calc(-100% - 16px));
+}
+
+.rv-shell__skip-link:focus {
+  transform: translateY(0);
+}
+
+.rv-shell__frame {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 248px minmax(0, 1fr);
+  align-items: start;
+}
+
+/* Sidebar: sticky, full height, scrolls on its own when the viewport is short. */
+.rv-shell__sidebar {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  height: 100vh;
+  height: 100dvh;
+  min-width: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 20px 14px 16px;
+  border-right: 1px solid var(--rv-line);
+  background: var(--rv-surface-subtle);
+}
+
+.rv-shell__brand {
+  min-width: 0;
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 6px;
+  border-radius: 7px;
+  color: var(--rv-text);
+  text-decoration: none;
+}
+
+.rv-shell__brand-mark {
+  width: 32px;
+  height: 32px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--rv-line-strong);
+  border-radius: 8px;
+  color: var(--rv-accent);
+  background: var(--rv-surface);
+}
+
+.rv-shell__brand-copy {
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+}
+
+.rv-shell__brand-copy > span {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.rv-shell__brand strong {
+  font-size: var(--rv-type-body);
+  font-weight: var(--rv-weight-semibold);
+  letter-spacing: var(--rv-tracking-heading);
+  line-height: var(--rv-leading-body);
+  white-space: nowrap;
+}
+
+.rv-shell__brand em {
+  color: var(--rv-accent);
+  font-size: var(--rv-type-body);
+  font-style: normal;
+  font-weight: var(--rv-weight-medium);
+  letter-spacing: var(--rv-tracking-heading);
+  line-height: var(--rv-leading-body);
+}
+
+.rv-shell__brand small {
+  overflow: hidden;
+  color: var(--rv-dim);
+  font-size: var(--rv-type-caption);
+  letter-spacing: var(--rv-tracking-normal);
+  line-height: var(--rv-leading-caption);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rv-shell__navs,
+.rv-shell__nav {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.rv-shell__group {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rv-shell__kicker {
+  margin: 0;
+  padding: 0 10px;
+  color: var(--rv-dim);
+  font-family: var(--rv-font-mono);
+  font-size: var(--rv-type-caption);
+  font-weight: var(--rv-weight-medium);
+  letter-spacing: var(--rv-tracking-label);
+  line-height: var(--rv-leading-caption);
+  text-transform: uppercase;
+}
+
+.rv-shell__nav-list {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  list-style: none;
+}
+
+.rv-shell__nav-link {
+  width: 100%;
+  min-height: 40px;
+  padding: 0 10px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--rv-muted);
+  background: transparent;
+  font-family: var(--rv-font-sans);
+  font-size: var(--rv-type-body);
+  font-weight: var(--rv-weight-medium);
+  letter-spacing: var(--rv-tracking-normal);
+  line-height: var(--rv-leading-ui);
+  text-align: start;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color 140ms ease, background-color 140ms ease, color 140ms ease;
+}
+
+/* Help is a button; restore the link typography that `.rv-shell button` resets. */
+.rv-shell .rv-shell__help {
+  font-family: var(--rv-font-sans);
+  font-size: var(--rv-type-body);
+  font-weight: var(--rv-weight-medium);
+  letter-spacing: var(--rv-tracking-normal);
+  line-height: var(--rv-leading-ui);
+}
+
+/* 16px icons in a 22px slot so labels align with the 22px pipeline nodes. */
+.rv-shell__nav-link > svg {
+  flex: none;
+  margin-inline: 3px;
+}
+
+.rv-shell__nav-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rv-shell__nav-link:hover {
+  color: var(--rv-text);
+  background: var(--rv-surface-hover);
+}
+
+.rv-shell__nav-link.is-active {
+  border-color: var(--rv-accent-line);
+  color: var(--rv-text);
+  background: var(--rv-surface-selected);
+}
+
+.rv-shell__nav-link.is-active > svg {
+  color: var(--rv-accent);
+}
+
+.rv-shell__nav-link:focus-visible,
+.rv-shell__brand:focus-visible {
+  outline: 2px solid var(--rv-accent);
+  outline-offset: 2px;
+}
+
+/* Pipeline track: a one-pixel connector runs behind the numbered nodes. */
+.rv-shell__track {
+  position: relative;
+}
+
+.rv-shell__track::before {
+  position: absolute;
+  top: 20px;
+  bottom: 20px;
+  left: 21px;
+  width: 1px;
+  content: "";
+  background: var(--rv-line-strong);
+}
+
+.rv-shell__node {
+  position: relative;
+  z-index: 1;
+  width: 22px;
+  height: 22px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--rv-connector);
+  border-radius: 50%;
+  color: var(--rv-muted);
+  background: var(--rv-surface-subtle);
+  font-family: var(--rv-font-mono);
+  font-size: var(--rv-type-caption);
+  font-weight: var(--rv-weight-medium);
+  letter-spacing: var(--rv-tracking-normal);
+  line-height: var(--rv-leading-caption);
+  transition: border-color 140ms ease, color 140ms ease;
+}
+
+.rv-shell__nav-link.is-active .rv-shell__node {
+  border-color: var(--rv-accent);
+  color: var(--rv-accent);
+}
+
+.rv-shell__count {
+  margin-left: auto;
+  padding-left: 8px;
+  flex: none;
+  color: var(--rv-muted);
+  font-family: var(--rv-font-mono);
+  font-size: var(--rv-type-caption);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--rv-weight-regular);
+  letter-spacing: var(--rv-tracking-normal);
+  line-height: var(--rv-leading-caption);
+}
+
+.rv-shell__count.is-hot {
+  color: var(--rv-amber);
+}
+
+/* Sidebar footer: deployment posture, account, theme. */
+.rv-shell__footer {
+  min-width: 0;
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 6px 0;
+  border-top: 1px solid var(--rv-line);
+}
+
+.rv-shell__posture {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.rv-shell__posture .rv-posture-chip {
+  max-width: 100%;
+  font-size: var(--rv-type-caption);
+  font-weight: var(--rv-weight-medium);
+  line-height: var(--rv-leading-caption);
+  overflow-wrap: anywhere;
+}
+
+.rv-shell__posture .rv-posture-chip.is-mono {
+  font-family: var(--rv-font-mono);
+}
+
+.rv-shell__posture-loading {
+  width: 72px;
+  height: 21px;
+  border: 1px solid var(--rv-line);
+  border-radius: 999px;
+  background: var(--rv-skeleton);
+}
+
+.rv-shell__account {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.rv-shell__auth-status {
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.rv-shell__help-guide-link {
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  margin-top: 8px;
+  padding: 0 10px;
+  border: 1px solid var(--rv-control-border);
+  border-radius: 6px;
+  color: var(--rv-text);
+  background: var(--rv-control-bg);
+  font-size: var(--rv-type-ui);
+  font-weight: var(--rv-weight-medium);
+  text-decoration: none;
+}
+
+.rv-shell .rv-shell__theme {
+  width: 36px;
+  min-width: 36px;
+  min-height: 36px;
+  margin-left: auto;
+  padding: 0;
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  border: 1px solid var(--rv-control-border);
+  border-radius: 7px;
+  color: var(--rv-muted);
+  background: var(--rv-control-bg);
+}
+
+.rv-shell .rv-shell__theme:hover {
+  border-color: var(--rv-control-border);
+  color: var(--rv-text);
+  background: var(--rv-control-hover);
+}
+
+.rv-shell .rv-shell__theme:focus-visible {
+  outline: 2px solid var(--rv-accent);
+  outline-offset: 2px;
+}
+
+/* Workspace: page content keeps the 1400px Orbit grid cap. */
+.rv-shell__main {
+  width: 100%;
+  min-width: 0;
+  max-width: calc(1400px + 64px);
+  margin: 0 auto;
+  padding: 32px 32px 56px;
+}
+
+.rv-shell__main:focus {
+  outline: none;
+}
+
+/*
+ * Shared Orbit panel: a bordered surface with a heading row (caption kicker in
+ * `small`, then the h2 or h3, and an optional trailing icon).
+ */
+.rv-orbit-panel-heading small {
+  color: var(--rv-dim);
+  font-family: var(--rv-font-mono);
+  font-size: var(--rv-type-caption);
+  font-weight: var(--rv-weight-medium);
+  letter-spacing: var(--rv-tracking-label);
+  line-height: var(--rv-leading-caption);
+  text-transform: uppercase;
+}
+
+.rv-orbit-panel {
+  min-width: 0;
+  border: 1px solid var(--rv-line);
+  border-radius: 10px;
+  background: var(--rv-surface);
+  scroll-margin-top: 24px;
+}
+
+.rv-orbit-panel-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.rv-orbit-panel-heading h2,
+.rv-orbit-panel-heading h3 {
+  margin: 4px 0 0;
+  font-size: var(--rv-type-title-sm);
+  font-weight: var(--rv-weight-semibold);
+  letter-spacing: var(--rv-tracking-heading);
+  line-height: var(--rv-leading-title-sm);
+}
+
+.rv-orbit-panel-heading h2 span,
+.rv-orbit-panel-heading h3 span {
+  color: var(--rv-dim);
+  font-size: var(--rv-type-caption);
+  font-weight: var(--rv-weight-regular);
+  line-height: var(--rv-leading-caption);
+}
+
+.rv-orbit-panel-heading > svg {
+  color: var(--rv-muted);
+}
+
+/* Compact desktop: the sidebar keeps every label; the workspace gutter narrows. */
+@media (max-width: 1360px) {
+  .rv-shell__main {
+    padding-inline: 28px;
+  }
+}
+
+/*
+ * Tablet and below: the sidebar becomes a static top bar. Row 1 is the brand
+ * and utilities; row 2 is one horizontally scrollable row with the pipeline
+ * and system items. Targets are at least 44px on these touch layouts.
+ */
+@media (max-width: 1120px) {
+  /* The top bar keeps its own height; a short page leaves the spare
+     viewport height below the content, not inside the bar's row. */
+  .rv-shell__frame {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto 1fr;
+  }
+
+  .rv-shell__sidebar {
+    position: static;
+    height: auto;
+    overflow: visible;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px 16px;
+    padding: 10px 20px 0;
+    border-right: 0;
+    border-bottom: 1px solid var(--rv-line);
+  }
+
+  .rv-shell__brand {
+    min-height: 44px;
+    grid-column: 1;
+    grid-row: 1;
+    justify-self: start;
+    padding: 0;
+  }
+
+  .rv-shell__footer {
+    grid-column: 2;
+    grid-row: 1;
+    margin: 0;
+    padding: 0;
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+    border-top: 0;
+  }
+
+  .rv-shell__account {
+    flex-wrap: nowrap;
+  }
+
+  .rv-shell__navs {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    flex-direction: row;
+    align-items: center;
+    gap: 4px;
+    margin: 0 -20px;
+    padding: 3px 20px 8px;
+    overflow-x: auto;
+    scrollbar-width: thin;
+  }
+
+  .rv-shell__nav,
+  .rv-shell__group,
+  .rv-shell__nav-list {
+    flex: none;
+    flex-direction: row;
+    align-items: center;
+    gap: 2px;
+  }
+
+  .rv-shell__system-nav {
+    margin-left: 6px;
+    padding-left: 8px;
+    border-left: 1px solid var(--rv-line);
+  }
+
+  .rv-shell__kicker,
+  .rv-shell__track::before {
+    display: none;
+  }
+
+  .rv-shell__nav-link {
+    width: auto;
+    min-height: 44px;
+    gap: 8px;
+  }
+
+  .rv-shell__nav-link > svg {
+    margin-inline: 0;
+  }
+
+  .rv-shell__nav-label {
+    overflow: visible;
+  }
+
+  .rv-shell .rv-shell__theme {
+    width: 44px;
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .rv-shell__account button {
+    min-height: 44px;
+  }
+
+  .rv-shell__main {
+    max-width: none;
+    padding: 28px 20px 52px;
+  }
+}
+
+@media (max-width: 700px) {
+  .rv-shell__sidebar {
+    padding-inline: 14px;
+  }
+
+  .rv-shell__navs {
+    margin-inline: -14px;
+    padding-inline: 14px;
+  }
+
+  /* Lowest-priority chrome: the edition stays evident from the navigation. */
+  .rv-shell__posture,
+  .rv-shell__brand small {
+    display: none;
+  }
+
+  .rv-shell__main button,
+  .rv-shell__main input:not([type="checkbox"]):not([type="radio"]),
+  .rv-shell__main select,
+  .rv-shell__main a.inline-flex {
+    min-height: 44px;
+  }
+
+  .rv-shell__main {
+    padding: 24px 14px 44px;
+  }
+}
+
+@media (max-width: 460px) {
+  .rv-shell__brand {
+    min-width: 44px;
+    justify-content: center;
+  }
+
+  .rv-shell__brand-copy {
+    display: none;
+  }
+
+  .rv-shell__nav-link {
+    padding-inline: 9px;
+  }
+
+  .rv-orbit-panel {
+    border-radius: 8px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rv-shell__nav-link,
+  .rv-shell__node {
+    transition: none;
+  }
+}
+
+.rv-shell__source {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin: 0;
+  font-size: var(--rv-type-caption);
+  color: var(--rv-muted);
+}
+.rv-shell__source a { text-decoration: underline; }

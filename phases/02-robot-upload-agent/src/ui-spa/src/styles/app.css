@@ -1,0 +1,36 @@
+@import "@robot-vault/ui-kit/tokens.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body, #root { height: 100%; }
+body { background-color: hsl(var(--background)); color: hsl(var(--foreground)); }
+
+.robot-console-shell {
+  min-width: 0;
+  min-height: 0;
+}
+
+.robot-console-shell > header > div {
+  flex-wrap: wrap;
+  row-gap: 0.75rem;
+}
+
+.robot-console-shell > header nav {
+  flex-wrap: wrap;
+}
+
+@media (max-width: 640px) {
+  .robot-console-shell > header > div {
+    column-gap: 1rem;
+  }
+
+  .robot-console-shell > header strong {
+    flex-basis: 100%;
+  }
+
+  .robot-console-shell > header nav {
+    flex-basis: 100%;
+  }
+}

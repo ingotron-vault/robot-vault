@@ -1,0 +1,39 @@
+# DEVELOPMENT/reference GC configuration. Env vars override these values at
+# runtime; release injects the scoped robot_vault_gc database role and
+# robot-vault-gc object-store identity rather than the owner defaults below.
+
+database_url: "postgres://robotvault:robotvault@postgres:5432/robotvault"
+
+s3:
+  bucket: "robotics-data"
+  endpoint: "http://objectstore:9000"
+  region: "us-east-1"
+  # For production, supply credentials via environment/secret/IAM; omit static keys here.
+
+gc:
+  min_age_hours: 72
+  delete_limit: 1000
+  # Default to reporting, not deleting. docker-compose.yml sets GC_DRY_RUN=true
+  # and env wins, so the composed stack was already safe -- but any invocation
+  # that reads this file WITHOUT the GC_* env vars (a manual run, a cron, a
+  # non-compose deployment) got a live-delete default. This is now the single
+  # collector in the codebase, so make its committed default the safe one and
+  # require an explicit opt-in to delete.
+  dry_run: true
+  interval_seconds: 3600
+  # Coverage is distinct from the set of live keys. `raw/`, `manifests/`, and
+  # `processed/parquet/` are covered by core-schema queries. The media, QA, and
+  # export namespaces become covered when their registry migration is
+  # present; a successful empty registry is authoritative, so aged orphans
+  # can be swept. Missing registries and unmodelled namespaces remain
+  # fail-closed. In particular, `cas/files/` is intentionally uncovered even
+  # though it is listed here, so its completed objects are never swept.
+  prefixes:
+    - "raw/"
+    - "manifests/"
+    - "processed/parquet/"
+    - "cas/files/"
+    - "processed/media/"
+    - "qa/reports/"
+    - "exports/"
+  metrics_port: 9108

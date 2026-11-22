@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Understand Robot Vault</title>
+  <meta name="description" content="Follow a recording through Robot Vault and find the right guide for your task.">
+  <style>
+    /* Light paper, blue links, narrow prose, and restrained rules. No external assets. */
+    :root{color-scheme:light;--paper:#f6f5f1;--ink:#14181f;--muted:#4e5663;--blue:#3d5680;--line:#cccac3;--wash:#e8ecf2}
+    *{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:17px/1.65 system-ui,sans-serif}
+    a{color:var(--blue);text-underline-offset:.2em}a:hover{color:var(--ink)}::selection{background:var(--blue);color:white}
+    :focus-visible{outline:3px solid var(--blue);outline-offset:4px}input{caret-color:var(--blue)}html{scrollbar-color:var(--blue) var(--paper)}
+    .skip{position:absolute;left:1rem;top:-5rem;background:var(--paper);padding:.5rem}.skip:focus{top:1rem}
+    header{border-bottom:1px solid var(--line);padding:1rem max(1.25rem,calc((100vw - 1120px)/2));display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap}
+    header a{font-size:.9rem}header strong{font-weight:600}main{max-width:1120px;padding:2.8rem 1.25rem 4rem;margin:auto}
+    h1{font-size:clamp(2.35rem,5vw,4.3rem);line-height:1.1;letter-spacing:-.035em;font-weight:500;margin:0 0 1.25rem;text-wrap:balance}
+    h2{font-size:1.7rem;line-height:1.2;font-weight:500;margin:3rem 0 1rem}h3{font-size:1.15rem;font-weight:600;margin:0 0 .55rem}
+    p{max-width:70ch;margin:.55rem 0 1rem}.intro{font-size:1.2rem;max-width:63ch}.muted{color:var(--muted)}
+    .paths{display:grid;grid-template-columns:1fr 1fr;gap:2rem;border-block:1px solid var(--line);padding:1.6rem 0;margin:2rem 0}
+    .paths p{font-size:1rem}.paths a{font-weight:600}.diagram{padding:1.25rem 0 .4rem}
+    .flow{list-style:none;padding:0;margin:0;display:grid;grid-template-columns:repeat(6,1fr)}
+    .flow li{position:relative;border-top:2px solid var(--blue);padding:1rem .9rem 1rem 0;min-width:0}
+    .flow li:not(:last-child)::after{content:'';position:absolute;right:9px;top:-6px;width:10px;height:10px;border-top:2px solid var(--blue);border-right:2px solid var(--blue);transform:rotate(45deg);background:var(--paper)}
+    .flow a{font-size:1rem;font-weight:600}.flow small{display:block;color:var(--muted);font-size:.84rem;margin-top:.4rem}
+    .note{font-size:.95rem;color:var(--muted)}.stages{margin-top:1.1rem}
+    details{border-top:1px solid var(--line);padding:.85rem 0}details:last-child{border-bottom:1px solid var(--line)}
+    summary{cursor:pointer;font-weight:600;padding:.25rem 0}summary:hover{color:var(--blue)}details[open] summary{margin-bottom:.7rem}
+    .stage-body{padding:0 0 .3rem 1.1rem}.stage-body p{font-size:1rem}.stage-body a{font-size:.95rem}
+    .tools{display:flex;align-items:flex-end;gap:1.5rem;flex-wrap:wrap;margin:1.5rem 0 1rem}.tools[hidden]{display:none}
+    label{display:block;font-size:.9rem;margin-bottom:.35rem}input{font:inherit;border:1px solid #8c929b;background:#fbfaf8;color:var(--ink);padding:.55rem .75rem;width:min(100%,25rem);border-radius:2px}
+    input::placeholder{color:var(--muted)}.search{flex:1;min-width:min(100%,16rem)}fieldset{border:0;padding:0;margin:0}legend{font-size:.9rem;margin-bottom:.35rem}
+    .roles{display:flex;gap:.35rem;flex-wrap:wrap}button{font:inherit;font-size:.92rem;padding:.55rem .85rem;background:transparent;border:1px solid #8c929b;border-radius:2px;cursor:pointer;color:var(--ink)}
+    button:hover{background:var(--wash)}button[aria-pressed=true]{background:var(--blue);border-color:var(--blue);color:white}
+    .results{list-style:none;padding:0;margin:0}.results li{display:grid;grid-template-columns:1fr 2fr;gap:1.25rem;border-top:1px solid var(--line);padding:1rem 0}
+    .results li[hidden]{display:none}.results a{font-weight:600}.results p{margin:0;font-size:.96rem}.status{font-size:.9rem;color:var(--muted);margin:.65rem 0}
+    .terms{display:grid;grid-template-columns:1fr 1fr;gap:1.25rem 2rem;margin:1rem 0}.terms dt{font-weight:600}.terms dd{margin:0;color:var(--muted);font-size:.97rem}
+    footer{border-top:1px solid var(--line);margin-top:3rem;padding-top:1.1rem;font-size:.9rem;color:var(--muted)}
+    @media(max-width:700px){main{padding-top:2rem}.paths{grid-template-columns:1fr;gap:1rem}.flow{grid-template-columns:1fr 1fr;counter-reset:stage}.flow li{margin-bottom:.7rem;counter-increment:stage}.flow a::before{content:counter(stage) '. '}.flow li:nth-child(2n)::after{display:none}.results li{grid-template-columns:1fr;gap:.35rem}.terms{grid-template-columns:1fr}.tools{align-items:stretch;gap:1rem}h2{margin-top:2.3rem}}
+    @media print{.tools{display:none!important}details .stage-body{display:block}header,footer{font-size:10pt}body{font-size:11pt}.paths,.flow{break-inside:avoid}}
+  </style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header><strong>Robot Vault documentation</strong><nav aria-label="Documentation"><a href="README.md">All documentation</a></nav></header>
+<main id="main">
+  <h1>Understand Robot Vault.</h1>
+  <p class="intro">Follow a robot recording from local storage to a training dataset. Then choose the guide for the work you need to do.</p>
+  <p class="muted">For operators and developers. Robot Vault is the product. Ingotron is the company and the name of the robot agent.</p>
+
+  <section class="paths" aria-label="Choose your environment">
+    <div><h2 style="margin:0 0 .7rem;font-size:1.2rem">I run a production server</h2><p>Install a release deployment with <code>make</code>, sign in through your own OIDC identity provider, and enroll each robot from the Robots page. Pro upgrades the same install.</p><a href="OPERATIONS.md#deploying-a-release">Open the release runbook</a></div>
+    <div><h2 style="margin:0 0 .7rem;font-size:1.2rem">I work from the source repository</h2><p>Use the development Compose stack to build and test on a Linux PC. A release deployment uses a separate topology and configuration.</p><a href="../README.md#quick-start">Open the source quick start</a></div>
+  </section>
+
+  <section aria-labelledby="flow-heading">
+    <h2 id="flow-heading">Where a recording goes</h2>
+    <p>Each stage has a different job. Receiving a file does not mean it is ready for training. Open a stage to see what it produces.</p>
+    <div class="diagram"><ol class="flow" aria-label="Recording data flow">
+      <li><a href="#record">Record</a><small>MCAP files on the robot</small></li>
+      <li><a href="#upload">Upload</a><small>Send selected stable files</small></li>
+      <li><a href="#verify">Verify &amp; store</a><small>Check bytes and register sources</small></li>
+      <li><a href="#process">Process</a><small>Parquet; Pro adds episodes and QA</small></li>
+      <li><a href="#query">Query &amp; review</a><small>Explore data; Pro adds review</small></li>
+      <li><a href="#export">Cut &amp; export</a><small>Signed training datasets, Pro only</small></li>
+    </ol></div>
+    <p class="note">PostgreSQL stores metadata and work records. The object store (RustFS) stores source and derived files. Core supports upload, integrity checks, Parquet, query, and the UI. Pro adds episodes, media, quality checks, dataset cuts, and export.</p>
+    <div class="stages">
+      <details id="record"><summary>Record: keep the source files on the robot</summary><div class="stage-body"><p>The recording system produces MCAP files. Robot-side storage builds manifests that describe the files and their hashes. It waits for files to stop changing before preparing them.</p><p>Retention controls protect pending, failed, and active uploads by default. Read the storage guide before changing deletion rules.</p><a href="../phases/01-robot-storage/docs/user.md">Robot storage guide</a></div></details>
+      <details id="upload"><summary>Upload: send selected files when a connection is available</summary><div class="stage-body"><p>An operator starts an upload through the CLI or robot console. The agent queues files and retries temporary failures. Version-one resume sends only the missing parts. The agent always requests it, and the ingest server must support it.</p><p>A release deployment uses server-authenticated TLS and a per-robot bearer credential (the default <code>token</code> profile). The optional <code>mtls</code> profile also requires a robot certificate. Follow the guide for your deployment.</p><a href="../phases/02-robot-upload-agent/docs/usage.md">Upload and enrollment guide</a></div></details>
+      <details id="verify"><summary>Verify &amp; store: confirm the received file matches the source</summary><div class="stage-body"><p>Ingest checks the assembled file against its expected SHA-256 hash before reporting completion. PostgreSQL records the upload and its identity. The object store holds the file bytes.</p><p>A hash confirms that the bytes match. It does not prove that the robot data is accurate or suitable for training.</p><a href="../phases/03-ingest-server-rs/docs/technical.md">Ingest integrity and storage reference</a></div></details>
+      <details id="process"><summary>Process: create queryable data and quality results</summary><div class="stage-body"><p>The processor reads MCAP and writes registered Parquet files. In Pro, it also creates episodes, media, and quality results. The quality checks are documented with the Pro edition.</p><p>DEFECT measures data quality. RISK measures operational risk in the recorded scene. Both scores run from 0 to 100; higher is better. They are separate scores; do not combine them into one judgment.</p><a href="../phases/04-processing-pipeline/docs/technical.md">Processing reference</a></div></details>
+      <details id="query"><summary>Query &amp; review: inspect what the system registered</summary><div class="stage-body"><p>The query service and Orbit UI expose registered data. Use Overview, Intake, and Explore to inspect the system and recordings. Review and Verification are Pro-only routes.</p><p>A useful query result is not yet a signed export. Continue with a reviewed dataset selection when preparing training data.</p><a href="USER_GUIDE.md">Product walkthrough</a> · <a href="../phases/05-query-service/docs/user.md">Query console guide</a></div></details>
+      <details id="export"><summary>Cut &amp; export: select a dataset and verify its source records</summary><div class="stage-body"><p>In Pro, a dataset cut records a selected set of episodes. Export produces a LeRobot v3 bundle or eligible, reviewed MCAP passthrough data. The signed records support source tracking and offline verification.</p><p>A signature confirms the signed records. It does not guarantee that a dataset is safe or suitable for every training task.</p><a href="USER_GUIDE.md">Signed-export walkthrough</a></div></details>
+    </div>
+  </section>
+
+  <section aria-labelledby="guides-heading">
+    <h2 id="guides-heading">Find a guide for your task</h2>
+    <p>These links open guides available in this checkout. Filter by reader or search the guide descriptions.</p>
+    <div class="tools" id="tools" hidden>
+      <div class="search"><label for="guide-search">Search guides</label><input id="guide-search" type="search" placeholder="Try backup, upload, or tests"></div>
+      <fieldset><legend>Show guides for</legend><div class="roles"><button type="button" data-role="all" aria-pressed="true">Everyone</button><button type="button" data-role="operator" aria-pressed="false">Operators</button><button type="button" data-role="developer" aria-pressed="false">Developers</button></div></fieldset>
+    </div>
+    <p id="guide-status" class="status" role="status" aria-live="polite">All guides are shown.</p>
+    <ul class="results" id="guide-list">
+      <li data-reader="developer"><a href="../README.md#quick-start">Start the development stack</a><p>Tools, local Compose startup, health checks, and example ingest from source.</p></li>
+      <li data-reader="operator developer"><a href="USER_GUIDE.md">Follow the product walkthrough</a><p>Run the source demonstration: upload, processing, and query.</p></li>
+      <li data-reader="operator developer"><a href="OPERATIONS.md">Operate a release deployment</a><p>Deployment inputs, your identity provider, robot enrollment, backup, restore, and upgrades for the release topology.</p></li>
+      <li data-reader="operator developer"><a href="CONFIG_REFERENCE.md">Find source configuration options</a><p>Environment variables, config files, units, defaults, and feature gates.</p></li>
+      <li data-reader="operator developer"><a href="../phases/02-robot-upload-agent/docs/usage.md">Upload from a robot</a><p>Robot identity, enrollment, file layout, upload commands, retry, and resume.</p></li>
+      <li data-reader="developer"><a href="ARCHITECTURE.md">Understand service boundaries</a><p>Data flow, security profiles, storage ownership, processing, and export.</p></li>
+      <li data-reader="developer"><a href="DB_SCHEMA.md">Inspect the database schema</a><p>Tables, registries, migrations, and relationships between stored records.</p></li>
+      <li data-reader="developer"><a href="TESTING.md">Run the right tests</a><p>Automated gates, prerequisites, live E2E checks, and manual acceptance limits.</p></li>
+      <li data-reader="developer"><a href="../development/README.md">Change the source</a><p>Development loop, optional host tools, generated files, and code conventions.</p></li>
+    </ul>
+    <p id="no-results" hidden>No guides match. Clear the search or choose Everyone. The <a href="README.md">full documentation index</a> lists more topics.</p>
+  </section>
+
+  <section aria-labelledby="terms-heading"><h2 id="terms-heading">Terms you will see</h2><dl class="terms">
+    <div><dt>MCAP</dt><dd>A recording file format for timestamped messages from a robot.</dd></div>
+    <div><dt>Parquet</dt><dd>A column-based file format. Robot Vault uses it to query extracted recording data.</dd></div>
+    <div><dt>Episode</dt><dd>A selected time range within a recording, used for review and dataset selection.</dd></div>
+    <div><dt>Manifest</dt><dd>A record of files and their identities, such as sizes and hashes. Its fields depend on the workflow.</dd></div>
+    <div><dt>SHA-256</dt><dd>A hash function used to compare file content and detect changed bytes.</dd></div>
+    <div><dt>TLS and mTLS</dt><dd>TLS protects a connection and authenticates the server. Mutual TLS also authenticates the client with a certificate.</dd></div>
+    <div><dt>QA</dt><dd>Quality assurance. The checks report data defects and operational risks separately.</dd></div>
+    <div><dt>Dataset cut</dt><dd>A recorded dataset selection. Export creates the files for training from that selection.</dd></div>
+  </dl></section>
+  <footer><p>This page explains the flow; the linked guides own the operating instructions. For the full map, use the <a href="README.md">documentation index</a>. For writing and review, use the <a href="DOCUMENTATION_STANDARD.md">documentation standard</a>.</p></footer>
+</main>
+<script>
+  const tools=document.getElementById('tools');
+  const input=document.getElementById('guide-search');
+  const buttons=[...document.querySelectorAll('[data-role]')];
+  const entries=[...document.querySelectorAll('#guide-list li')];
+  let reader='all';
+  function filter(){
+    const query=input.value.trim().toLowerCase();
+    let count=0;
+    for(const entry of entries){
+      const matches=(reader==='all'||entry.dataset.reader.split(' ').includes(reader))&&entry.textContent.toLowerCase().includes(query);
+      entry.hidden=!matches;if(matches)count++;
+    }
+    document.getElementById('guide-status').textContent=count+' guide'+(count===1?'':'s')+' shown.';
+    document.getElementById('no-results').hidden=count!==0;
+  }
+  for(const button of buttons)button.addEventListener('click',()=>{reader=button.dataset.role;for(const item of buttons)item.setAttribute('aria-pressed',String(item===button));filter();});
+  input.addEventListener('input',filter);
+  function openStage(){const stage=document.getElementById(location.hash.slice(1));if(stage&&stage.tagName==='DETAILS')stage.open=true;}
+  window.addEventListener('hashchange',openStage);openStage();
+  tools.hidden=false;filter();
+</script>
+</body>
+</html>

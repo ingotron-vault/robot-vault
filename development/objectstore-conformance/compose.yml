@@ -1,0 +1,60 @@
+# Object-store conformance gate: our first-party RustFS image (the pinned RustFS plus patched OpenSSL) with the frozen settings of
+# development/objectstore/CONTRACT.md, plus a test runner. Test-only; the product compose files
+# take the same image and environment. Run through run.sh (see README.md).
+services:
+  objectstore:
+    build:
+      context: ../..
+      dockerfile: deploy/release-images/objectstore.Dockerfile
+      args: {GIT_SHA: "${GIT_SHA:-unknown}"}
+    image: robot-vault-objectstore:latest
+    # Only because a test runner may bind the named volume to a folder owned by the caller.
+    # The product runs as the image user (10001) on a named volume.
+    user: "0"
+    environment:
+      RUSTFS_ACCESS_KEY: rdv-test-root
+      RUSTFS_SECRET_KEY_FILE: /run/secrets/objectstore_root_password
+      RUSTFS_VOLUMES: /data
+      RUSTFS_ADDRESS: "0.0.0.0:9000"
+      RUSTFS_CONSOLE_ENABLE: "false"
+      # Durability (development/objectstore/CONTRACT.md): fsync payload, xl.meta and commit-rename directories
+      # before any acknowledgement; a bad mode value must not fall back to legacy-off.
+      RUSTFS_DURABILITY_MODE: strict
+      RUSTFS_DRIVE_SYNC_ENABLE: "true"
+      RUSTFS_NEW_BUCKET_DURABILITY_MODE: strict
+      RUSTFS_PUT_RENAME_EARLY_ACK_ENABLE: "false"
+      # Stale multipart expiry (development/objectstore/CONTRACT.md): longer than 14 days + 15 minutes.
+      # The STALE_* overrides exist only for the expiry proof in run.sh.
+      RUSTFS_API_STALE_UPLOADS_EXPIRY: ${STALE_EXPIRY:-360h}
+      RUSTFS_API_STALE_UPLOADS_CLEANUP_INTERVAL: ${STALE_INTERVAL:-6h}
+      RUSTFS_OBS_LOGGER_LEVEL: info
+    secrets: [objectstore_root_password]
+    volumes: [objectstore_data:/data]
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://127.0.0.1:9000/health/ready"]
+      interval: 5s
+      timeout: 3s
+      retries: 24
+      start_period: 5s
+    networks:
+      default:
+        aliases: [objectstore-public]
+
+  runner:
+    profiles: [run]
+    build: {context: ., dockerfile: runner.Dockerfile}
+    image: rv-objectstore-runner:local
+    user: "${RUNNER_UID:-1000}:${RUNNER_GID:-1000}"
+    # CONFORMANCE_ENV_FILE exists for the red proof of the missing-key rule (README.md).
+    env_file: ${CONFORMANCE_ENV_FILE:-test.env}
+    environment: {REPO: /repo, OBJECTSTORE_POLICY_DIR: /repo/development/release/objectstore-policies}
+    volumes: ["../..:/repo:ro", "./results:/out"]
+    working_dir: /repo
+    entrypoint: ["python"]
+
+secrets:
+  objectstore_root_password:
+    file: ./test-root-password
+
+volumes:
+  objectstore_data:

@@ -1,0 +1,562 @@
+# Development stack of the core edition. ROBOT_VAULT_EDITION defaults to core.
+
+# Development object-store keys: one fixed access key per service, as in the
+# release stack (CONTRACT.md section 8). The secrets are development defaults;
+# override them in .env. The bootstrap one-shot creates the users from these.
+x-dev-s3-keys: &dev-s3-keys
+  INGEST_S3_ACCESS_KEY: robot-vault-ingest
+  INGEST_S3_SECRET_KEY: ${INGEST_S3_SECRET_KEY:-dev-ingest-s3-secret-change-me}
+  PROCESSOR_S3_ACCESS_KEY: robot-vault-processor
+  PROCESSOR_S3_SECRET_KEY: ${PROCESSOR_S3_SECRET_KEY:-dev-processor-s3-secret-change-me}
+  EXPORTER_S3_ACCESS_KEY: robot-vault-exporter
+  EXPORTER_S3_SECRET_KEY: ${EXPORTER_S3_SECRET_KEY:-dev-exporter-s3-secret-change-me}
+  QUERY_S3_ACCESS_KEY: robot-vault-query
+  QUERY_S3_SECRET_KEY: ${QUERY_S3_SECRET_KEY:-dev-query-s3-secret-change-me}
+  GC_S3_ACCESS_KEY: robot-vault-gc
+  GC_S3_SECRET_KEY: ${GC_S3_SECRET_KEY:-dev-gc-s3-secret-change-me}
+
+services:
+  # A dependency-only preflight for credential-bearing development shortcuts.
+  # It never receives a secret value; it only receives whether the operator
+  # supplied one and the requested host bind addresses. See the script for the
+  # refusal/warning policy and `deploy/docker-compose.debug.yml` for publication.
+  dev-ingest-credential-guard:
+    image: busybox:1.36.1
+    container_name: robot-vault-dev-ingest-credential-guard
+    environment:
+      - DEV_GUARD_SCOPE=ingest
+      - DEV_DEBUG_BIND_HOST=${DEBUG_BIND_HOST:-127.0.0.1}
+      - DEV_ROBOT_BIND_HOST=${ROBOT_BIND_HOST:-127.0.0.1}
+      # `:+true` records presence without copying the token into this service.
+      - DEV_INGEST_AUTH_TOKEN_SET=${INGEST_AUTH_TOKEN:+true}
+    volumes:
+      - type: bind
+        source: ./development/check-dev-compose-credentials.sh
+        target: /check-dev-compose-credentials.sh
+        read_only: true
+        bind: { create_host_path: false }
+    entrypoint: ["/bin/sh", "/check-dev-compose-credentials.sh"]
+    restart: "no"
+
+  dev-storage-credential-guard:
+    image: busybox:1.36.1
+    container_name: robot-vault-dev-storage-credential-guard
+    environment:
+      - DEV_GUARD_SCOPE=storage
+      - DEV_DEBUG_BIND_HOST=${DEBUG_BIND_HOST:-127.0.0.1}
+    volumes:
+      - type: bind
+        source: ./development/check-dev-compose-credentials.sh
+        target: /check-dev-compose-credentials.sh
+        read_only: true
+        bind: { create_host_path: false }
+    entrypoint: ["/bin/sh", "/check-dev-compose-credentials.sh"]
+    restart: "no"
+
+  dev-query-credential-guard:
+    image: busybox:1.36.1
+    container_name: robot-vault-dev-query-credential-guard
+    environment:
+      - DEV_GUARD_SCOPE=query
+      - DEV_QUERY_BIND_HOST=${QUERY_BIND_HOST:-127.0.0.1}
+      - DEV_UI_BIND_HOST=${UI_BIND_HOST:-127.0.0.1}
+      # configs/query.env enables the development OIDC issuer. Its /dev/token
+      # endpoint mints an admin token, so a LAN bind needs a separate, explicit
+      # acknowledgement. Do not infer consent from QUERY_BIND_HOST alone.
+      - DEV_QUERY_OIDC_DEV=true
+      - DEV_QUERY_UNSAFE_EXPOSURE_ALLOWED=${ALLOW_UNSAFE_DEV_QUERY_EXPOSURE:-}
+    volumes:
+      - type: bind
+        source: ./development/check-dev-compose-credentials.sh
+        target: /check-dev-compose-credentials.sh
+        read_only: true
+        bind: { create_host_path: false }
+    entrypoint: ["/bin/sh", "/check-dev-compose-credentials.sh"]
+    restart: "no"
+
+  dev:
+    build:
+      context: .
+      args:
+        GIT_SHA: ${GIT_SHA:-unknown}
+    image: robot-vault-dev:latest
+    container_name: robot-vault-dev
+    working_dir: /app
+    environment:
+      # Same shared ingest token the `ingest` service expects — the e2e
+      # suite runs `rua upload` from inside this service.
+      - INGEST_AUTH_TOKEN=${INGEST_AUTH_TOKEN:-dev-ingest-token-change-me}
+    volumes:
+      - .:/app
+      - ${ROBOT_DATA_HOST_DIR:-./data/robot_data}:/tmp/robot_data
+    command: ["sleep", "infinity"]
+  # Rust ingest tests, dockerized so no host Rust toolchain is needed (the
+  # README's "no local installs beyond Docker" claim covers this too). Reuses
+  # the ingest Dockerfile's builder stage, which already has protoc and the
+  # fetched crate deps. Profile-gated so it never starts with the stack:
+  # run it via `make test-rust`.
+  rust-test:
+    profiles: ["test"]
+    build:
+      context: .
+      dockerfile: phases/03-ingest-server-rs/Dockerfile
+      target: builder
+    image: robot-vault-ingest-builder:latest
+    container_name: robot-vault-rust-test
+    working_dir: /app
+    volumes:
+      - ./phases/03-ingest-server-rs/src:/app/src:ro
+      - ./proto:/app/proto:ro
+      - cargo_target:/app/target
+    command: ["cargo", "test"]
+  # Ephemeral Postgres for the migration-integration cases collected by
+  # `make test-unit`. It has no host port or persistent volume and is removed
+  # by the Make target after the suite, so tests never mutate the dev database.
+  test-postgres:
+    profiles: ["test"]
+    image: postgres:16.4-alpine
+    environment:
+      POSTGRES_USER: robotvault
+      POSTGRES_PASSWORD: robotvault
+      POSTGRES_DB: robotvault
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U robotvault -d robotvault"]
+      interval: 1s
+      timeout: 3s
+      retries: 30
+  db-migrate:
+    build:
+      context: .
+      args:
+        GIT_SHA: ${GIT_SHA:-unknown}
+    image: robot-vault-dev:latest
+    container_name: robot-vault-db-migrate
+    working_dir: /app
+    environment:
+      - DATABASE_URL=${DATABASE_URL:-postgres://robotvault:robotvault@postgres:5432/robotvault}
+    volumes:
+      - .:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["python", "db/migrate.py"]
+  ingest:
+    build:
+      context: .
+      dockerfile: phases/03-ingest-server-rs/Dockerfile
+      args:
+        GIT_SHA: ${GIT_SHA:-unknown}
+        # The ingest image sets org.opencontainers.image.version from this
+        # argument. Set RELEASE_VERSION when you build a release image.
+        RELEASE_VERSION: ${RELEASE_VERSION:-unknown}
+        RELEASE_SOURCE_URL: ${RELEASE_SOURCE_URL:-https://github.com/ingotron-vault/robot-vault}
+        RELEASE_VENDOR: ${RELEASE_VENDOR:-Ingotron}
+    image: robot-vault-ingest:latest
+    container_name: robot-vault-ingest
+    env_file:
+      - ./configs/ingest.env
+    # NO host `ports:`. gRPC 50051 and admin 8080 are reachable
+    # only from inside the compose network (`ingest:50051` / `ingest:8080`).
+    # To reach them from the host — debugging, grpcurl, curling /healthz or /metrics —
+    # opt in explicitly with the overlay:
+    #   docker compose -f docker-compose.yml -f deploy/docker-compose.debug.yml up -d
+    #   (or `make debug-up`)
+    environment:
+      # Shared-token auth for the gRPC data plane and /admin/*.
+      # `make stack-up` writes a random per-machine token into .env; the
+      # committed fallback below only keeps a bare `docker compose up -d`
+      # working out of the box, and the server logs a warning when it is in
+      # use. Set INGEST_AUTH_TOKEN to a real secret for anything shared.
+      - INGEST_AUTH_TOKEN=${INGEST_AUTH_TOKEN:-dev-ingest-token-change-me}
+      # Its own object-store key (the bootstrap one-shot creates it).
+      - AWS_ACCESS_KEY_ID=robot-vault-ingest
+      - AWS_SECRET_ACCESS_KEY=${INGEST_S3_SECRET_KEY:-dev-ingest-s3-secret-change-me}
+      # TLS/mTLS for the gRPC listener. Off by default so a fresh
+      # `make stack-up` needs no cert step; `make certs` + TLS_ENABLED=true
+      # (plus TLS_MTLS=true for client certs) turns it on — see
+      # docs/CONFIG_REFERENCE.md (ingest TLS/mTLS) and the phase 03 docs'
+      # "TLS variant". Paths point into the ./certs mount below.
+      - TLS_ENABLED=${TLS_ENABLED:-false}
+      - TLS_MTLS=${TLS_MTLS:-false}
+      - TLS_SERVER_CERT=${TLS_SERVER_CERT:-/app/certs/ingest.crt}
+      - TLS_SERVER_KEY=${TLS_SERVER_KEY:-/app/certs/ingest.key}
+      - TLS_CA_CERT=${TLS_CA_CERT:-/app/certs/ca.crt}
+      # The dev entrypoint checks the actual token in this service without
+      # copying it into the dependency-only guard's environment.
+      - DEV_DEBUG_BIND_HOST=${DEBUG_BIND_HOST:-127.0.0.1}
+      - DEV_ROBOT_BIND_HOST=${ROBOT_BIND_HOST:-127.0.0.1}
+    volumes:
+      - ./configs:/app/configs
+      - ./uploads:/app/uploads
+      - ./certs:/app/certs:ro
+      - type: bind
+        source: ./development/dev-ingest-entrypoint.sh
+        target: /usr/local/bin/dev-ingest-entrypoint.sh
+        read_only: true
+        bind: { create_host_path: false }
+    entrypoint: ["/usr/local/bin/dev-ingest-entrypoint.sh"]
+    command: ["ingest-server"]
+    depends_on:
+      dev-ingest-credential-guard:
+        condition: service_completed_successfully
+      objectstore:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      objectstore-access-ready:
+        condition: service_completed_successfully
+      db-migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      # The ingest image has no curl. Its built-in probe requests /readyz and
+      # preserves the same dependency-aware readiness semantics.
+      test: ["CMD", "ingest-server", "--healthcheck"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+  robot:
+    build:
+      context: .
+      args:
+        GIT_SHA: ${GIT_SHA:-unknown}
+    image: robot-vault-dev:latest
+    container_name: robot-vault-robot
+    working_dir: /app
+    environment:
+      - VAULT_CONFIG_PATH=${VAULT_CONFIG_PATH:-/app/configs/vault.local.json}
+      # Presented as `authorization: Bearer <token>` on every upload RPC.
+      - INGEST_AUTH_TOKEN=${INGEST_AUTH_TOKEN:-dev-ingest-token-change-me}
+      # Smart batching and connection-quality detection are unconditional and
+      # have no switches -- see robot_upload_agent/smart_batching.py.
+    volumes:
+      - .:/app
+      - ${ROBOT_DATA_HOST_DIR:-./data/robot_data}:/tmp/robot_data
+      - ./configs:/app/configs
+      - ./certs:/app/certs:ro
+    command: ["python", "-m", "uvicorn", "robot_upload_agent.web:app", "--host", "0.0.0.0", "--port", "8090"]
+    ports:
+      # Robot-side upload UI — user-facing, stays published, but bound to
+      # loopback by default: /api/upload/* takes NO credential, and this
+      # container holds INGEST_AUTH_TOKEN, so a LAN-reachable 8090 would let
+      # any peer drive authenticated uploads through it (a confused deputy
+      # around the ingest token). Set ROBOT_BIND_HOST=0.0.0.0 to reach it from
+      # another machine, and only on a trusted network.
+      - "${ROBOT_BIND_HOST:-127.0.0.1}:${ROBOT_PORT:-8090}:8090"
+    depends_on:
+      dev-ingest-credential-guard:
+        condition: service_completed_successfully
+  # One-shot demo-data seeder. NOT started by `stack-up` or `docker compose up` —
+  # gated behind the "seed" profile so it only runs when explicitly requested:
+  #   make proto && docker compose --profile seed up seed
+  # (rua's transport imports the generated upload_pb2 module; `make proto`
+  # regenerates it into the host tree since this service's bind mount shadows
+  # whatever the dev image generated at build time — see `proto` in Makefile.)
+  # Generates a tiny MCAP and pushes it through the real rsm (scan/hash) + rua
+  # (upload) path against the running `ingest` service, exactly like a real
+  # robot would. See docs/reference/COMPOSE_MINIMAL.md.
+  seed:
+    build:
+      context: .
+      args:
+        GIT_SHA: ${GIT_SHA:-unknown}
+    image: robot-vault-dev:latest
+    container_name: robot-vault-seed
+    working_dir: /app
+    profiles: ["seed"]
+    environment:
+      # The seeder drives the real rua upload path, so it needs the token too.
+      - INGEST_AUTH_TOKEN=${INGEST_AUTH_TOKEN:-dev-ingest-token-change-me}
+    volumes:
+      - .:/app
+    depends_on:
+      ingest:
+        condition: service_healthy
+      processor:
+        condition: service_started
+      query:
+        condition: service_started
+    command: ["bash", "development/seed.sh"]
+  processor:
+    build:
+      context: .
+      dockerfile: phases/04-processing-pipeline/Dockerfile
+      args:
+        GIT_SHA: ${GIT_SHA:-unknown}
+    image: robot-vault-core-processor:latest
+    container_name: robot-vault-processor
+    working_dir: /app
+    depends_on:
+      ingest:
+        condition: service_started
+      db-migrate:
+        condition: service_completed_successfully
+      objectstore-access-ready:
+        condition: service_completed_successfully
+    env_file:
+      - ./configs/processor.env
+    environment:
+      - AWS_ACCESS_KEY_ID=robot-vault-processor
+      - AWS_SECRET_ACCESS_KEY=${PROCESSOR_S3_SECRET_KEY:-dev-processor-s3-secret-change-me}
+      # Edition block. `core` is upload -> integrity -> Parquet -> query/UI.
+      # The core processor refuses SEGMENTATION_ENABLED, QA_ENABLED or
+      # MEDIA_ENCODE_ENABLED set to true, so this file sets none of them.
+      - ROBOT_VAULT_EDITION=${ROBOT_VAULT_EDITION:-core}
+    command: ["python3", "-m", "processor.cli", "--watch", "--interval", "5"]
+  query:
+    build:
+      context: .
+      dockerfile: phases/05-query-service/Dockerfile
+      args:
+        GIT_SHA: ${GIT_SHA:-unknown}
+    image: robot-vault-core-query:latest
+    container_name: robot-vault-query
+    working_dir: /app
+    env_file:
+      - ./configs/query.env
+    environment:
+      # The authoritative edition gate. `core` serves no Pro
+      # routes (they 404 and are absent from /openapi.json), and the SPA reads
+      # `GET /api/v1/edition`. Read once at import, so changing it means
+      # recreating this service.
+      ROBOT_VAULT_EDITION: "${ROBOT_VAULT_EDITION:-core}"
+      AWS_ACCESS_KEY_ID: robot-vault-query
+      AWS_SECRET_ACCESS_KEY: "${QUERY_S3_SECRET_KEY:-dev-query-s3-secret-change-me}"
+      PROMETHEUS_BASE: "http://prometheus:9090"
+      TIME_INDEX_CACHE_SIZE_MB: "${TIME_INDEX_CACHE_SIZE_MB:-512}"
+      DUCKDB_THREADS: "${DUCKDB_THREADS:-2}"
+      DUCKDB_MEMORY_LIMIT_MB: "${DUCKDB_MEMORY_LIMIT_MB:-512}"
+      DUCKDB_QUERY_CONCURRENCY: "${DUCKDB_QUERY_CONCURRENCY:-4}"
+      DUCKDB_QUERY_ACQUIRE_TIMEOUT_SECONDS: "${DUCKDB_QUERY_ACQUIRE_TIMEOUT_SECONDS:-5}"
+      DUCKDB_QUERY_TIMEOUT_SECONDS: "${DUCKDB_QUERY_TIMEOUT_SECONDS:-30}"
+      QUERY_MAX_SOURCE_RANGE_SECONDS: "${QUERY_MAX_SOURCE_RANGE_SECONDS:-2678400}"
+      QUERY_MAX_SOURCE_FILES: "${QUERY_MAX_SOURCE_FILES:-5000}"
+      QUERY_MAX_SOURCE_ROWS: "${QUERY_MAX_SOURCE_ROWS:-10000000}"
+      QUERY_MAX_SOURCE_BYTES: "${QUERY_MAX_SOURCE_BYTES:-21474836480}"
+      SQL_CONSOLE_MEMORY_LIMIT_MB: "${SQL_CONSOLE_MEMORY_LIMIT_MB:-512}"
+      # The query image embeds its build revision as GIT_SHA. Do not override
+      # it with an empty host value: cuts record the running image's revision.
+    ports:
+      # Development OIDC can mint an admin token, so keep the UI/API on this
+      # machine by default. A trusted-LAN demo widening this API or the Vite UI
+      # must also set ALLOW_UNSAFE_DEV_QUERY_EXPOSURE=1; the shared guard
+      # refuses partial opt-in and prints the remaining risk.
+      - "${QUERY_BIND_HOST:-127.0.0.1}:${QUERY_PORT:-8003}:8003"
+    volumes:
+      - ./uploads:/app/uploads:ro
+    depends_on:
+      dev-query-credential-guard:
+        condition: service_completed_successfully
+      processor:
+        condition: service_started
+      objectstore-access-ready:
+        condition: service_completed_successfully
+      redis:
+        condition: service_started
+      db-migrate:
+        condition: service_completed_successfully
+  ui:
+    image: node:20.19-bookworm-slim
+    container_name: robot-vault-ui
+    working_dir: /repo
+    volumes:
+      # The SPA depends on the @robot-vault/ui-kit workspace package (shared
+      # Tailwind preset + tokens.css + components). npm workspaces resolve
+      # that dependency via a node_modules symlink into phases/ui-kit, so
+      # the workspace root manifests AND phases/ui-kit must be in the
+      # container alongside the SPA, or "@robot-vault/ui-kit" does not
+      # resolve. Mirrors phases/05-query-service/Dockerfile's ui-build stage.
+      - ./package.json:/repo/package.json:ro
+      - ./package-lock.json:/repo/package-lock.json:ro
+      - ./phases/ui-kit:/repo/phases/ui-kit
+      - ./phases/05-query-service/src/ui-spa:/repo/phases/05-query-service/src/ui-spa
+      - ui_node_modules:/repo/node_modules
+    command: ["sh","-c","npm ci && npm run dev -w robot-vault-ui"]
+    ports:
+      # Vite dev server for the SPA — a dev-only server, so loopback by
+      # default like the robot UI. Because it uses the same OIDC_DEV admin-token
+      # path, widening UI_BIND_HOST also requires the explicit guard opt-in.
+      - "${UI_BIND_HOST:-127.0.0.1}:${UI_PORT:-5173}:5173"
+    depends_on:
+      - query
+  # Object store: RustFS, pinned and configured exactly as
+  # development/objectstore/CONTRACT.md says. NO host `ports:`:
+  # in-network clients use http://objectstore:9000; for host access (the
+  # AWS CLI, rclone, or explicitly direct presigned URLs) opt in with
+  # `docker compose -f docker-compose.yml -f deploy/docker-compose.debug.yml up -d`,
+  # which publishes the S3 API on 9002. With S3_PUBLIC_ENDPOINT unset, browser
+  # downloads use the same-origin query proxy and need no host port.
+  objectstore:
+    build:
+      context: .
+      dockerfile: deploy/release-images/objectstore.Dockerfile
+      args:
+        GIT_SHA: ${GIT_SHA:-unknown}
+        RELEASE_VERSION: ${RELEASE_VERSION:-unknown}
+        RELEASE_SOURCE_URL: ${RELEASE_SOURCE_URL:-https://github.com/ingotron-vault/robot-vault}
+        RELEASE_VENDOR: ${RELEASE_VENDOR:-Ingotron}
+    image: robot-vault-objectstore:latest
+    container_name: robot-vault-objectstore
+    environment:
+      RUSTFS_ACCESS_KEY: ${OBJECTSTORE_ROOT_USER:-robot-vault-dev-root}
+      RUSTFS_SECRET_KEY_FILE: /run/secrets/objectstore_root_password
+      RUSTFS_VOLUMES: /data
+      RUSTFS_ADDRESS: "0.0.0.0:9000"
+      RUSTFS_CONSOLE_ENABLE: "false"
+      RUSTFS_DURABILITY_MODE: strict
+      RUSTFS_DRIVE_SYNC_ENABLE: "true"
+      RUSTFS_NEW_BUCKET_DURABILITY_MODE: strict
+      RUSTFS_PUT_RENAME_EARLY_ACK_ENABLE: "false"
+      # Ingest keeps a resumable session for up to 14 days; the RustFS default
+      # (24h) would abort its multipart upload. Write exactly `360h`.
+      RUSTFS_API_STALE_UPLOADS_EXPIRY: 360h
+      RUSTFS_API_STALE_UPLOADS_CLEANUP_INTERVAL: 6h
+    secrets: [objectstore_root_password]
+    volumes:
+      - objectstore_data:/data
+    depends_on:
+      dev-storage-credential-guard:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://127.0.0.1:9000/health/ready"]
+      interval: 5s
+      timeout: 3s
+      retries: 24
+      start_period: 5s
+  # One-shot: the bucket and the five least-privilege service keys, through the
+  # same bootstrap and policies as the release stack. Services wait for it.
+  objectstore-access-ready:
+    image: robot-vault-dev:latest
+    container_name: robot-vault-objectstore-access-ready
+    restart: "no"
+    depends_on:
+      objectstore:
+        condition: service_healthy
+    environment:
+      <<: *dev-s3-keys
+      S3_ENDPOINT: http://objectstore:9000
+      S3_BUCKET: ${S3_BUCKET:-robotics-data}
+      S3_REGION: us-east-1
+      OBJECTSTORE_ROOT_USER: ${OBJECTSTORE_ROOT_USER:-robot-vault-dev-root}
+      OBJECTSTORE_ROOT_PASSWORD_FILE: /run/secrets/objectstore_root_password
+    secrets: [objectstore_root_password]
+    configs:
+      - {source: objectstore_bootstrap, target: /release/objectstore_bootstrap.py}
+      - {source: objectstore_policy_ingest, target: /release/objectstore-policies/ingest.json}
+      - {source: objectstore_policy_processor, target: /release/objectstore-policies/processor.json}
+      - {source: objectstore_policy_exporter, target: /release/objectstore-policies/exporter.json}
+      - {source: objectstore_policy_query, target: /release/objectstore-policies/query.json}
+      - {source: objectstore_policy_gc, target: /release/objectstore-policies/gc.json}
+    entrypoint: ["python3", "/release/objectstore_bootstrap.py"]
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    container_name: robot-vault-prometheus
+    profiles: ["obs"]
+    ports:
+      - "${PROMETHEUS_BIND_HOST:-127.0.0.1}:${PROMETHEUS_PORT:-9090}:9090"
+    volumes:
+      - ./configs/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    command: ["--config.file=/etc/prometheus/prometheus.yml"]
+    depends_on:
+      - ingest
+      - query
+  # Valkey (BSD-3-Clause), the same Redis protocol; see deploy/docker-compose.release.yml.
+  redis:
+    image: valkey/valkey:8.1.11-alpine@sha256:2602ace2be6569bc2bbb06f873776516ab9089821525be34f4305c67eb9db02a
+    container_name: robot-vault-redis
+    # No host port mapping; access via service name inside network
+  # See tools/s3_gc.py and its reachability tests. GC_DRY_RUN defaults to
+  # "true" here so the first real deploy of GC only *logs* intended
+  # deletions ("DRY-DELETE <key>") instead of performing them; flip it to
+  # "false" (via a GC_DRY_RUN=false env var) once the dry-run output has been
+  # reviewed and looks correct.
+  gc:
+    build:
+      context: .
+      args:
+        GIT_SHA: ${GIT_SHA:-unknown}
+    image: robot-vault-dev:latest
+    container_name: robot-vault-gc
+    working_dir: /app
+    environment:
+      - DATABASE_URL=${DATABASE_URL:-postgres://robotvault:robotvault@postgres:5432/robotvault}
+      - S3_BUCKET=${S3_BUCKET:-robotics-data}
+      - S3_ENDPOINT=${S3_ENDPOINT:-http://objectstore:9000}
+      - S3_REGION=${S3_REGION:-us-east-1}
+      - AWS_ACCESS_KEY_ID=robot-vault-gc
+      - AWS_SECRET_ACCESS_KEY=${GC_S3_SECRET_KEY:-dev-gc-s3-secret-change-me}
+      - GC_MIN_AGE_HOURS=${GC_MIN_AGE_HOURS:-24}
+      - GC_DELETE_LIMIT=${GC_DELETE_LIMIT:-2000}
+      - GC_DRY_RUN=${GC_DRY_RUN:-true}
+      # Active registries cover raw uploads, CAS manifests, Parquet, media, QA
+      # reports and exports. A successfully queried but empty registry is safe
+      # to sweep; a missing/unreadable registry fails closed. `cas/files/` is
+      # listed only so stale multipart uploads can be aborted: object
+      # reachability is intentionally unmodelled, so CAS objects are never
+      # deleted.
+      - GC_PREFIXES=${GC_PREFIXES:-raw/,manifests/,processed/parquet/,cas/files/,processed/media/,qa/reports/,exports/}
+      # The collector and Prometheus always use the Compose-network port.
+      # GC_METRICS_PORT controls only the optional loopback publication below.
+      - METRICS_PORT=9108
+      - GC_CONFIG_PATH=/app/configs/gc.yaml
+    entrypoint: ["/bin/sh","-c","sh /app/tools/gc_runner.sh"]
+    depends_on:
+      objectstore:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      objectstore-access-ready:
+        condition: service_completed_successfully
+      db-migrate:
+        condition: service_completed_successfully
+    ports:
+      # GC's Prometheus metrics — internal, loopback only (Prometheus scrapes
+      # it over the compose network, not via the host).
+      - "${GC_BIND_HOST:-127.0.0.1}:${GC_METRICS_PORT:-9108}:9108"
+  postgres:
+    image: postgres:16.4-alpine
+    container_name: robot-vault-postgres
+    environment:
+      - POSTGRES_DB=robotvault
+      - POSTGRES_USER=robotvault
+      - POSTGRES_PASSWORD=robotvault
+    depends_on:
+      dev-storage-credential-guard:
+        condition: service_completed_successfully
+    # NO host `ports:`. Postgres uses the committed `robotvault:robotvault`
+    # credentials, so it is not published. psql from inside the network
+    # (`docker compose exec postgres psql -U robotvault -d robotvault`) or use the
+    # deploy/docker-compose.debug.yml overlay to republish 5432 on the host.
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U robotvault -d robotvault"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+secrets:
+  # Development root password (a committed default). Point
+  # OBJECTSTORE_ROOT_PASSWORD_FILE at your own file to change it.
+  objectstore_root_password:
+    file: ${OBJECTSTORE_ROOT_PASSWORD_FILE:-./configs/objectstore-root-password.dev}
+
+configs:
+  objectstore_bootstrap:
+    file: ./development/objectstore/bootstrap.py
+  objectstore_policy_ingest:
+    file: ./development/release/objectstore-policies/ingest.json
+  objectstore_policy_processor:
+    file: ./development/release/objectstore-policies/processor.json
+  objectstore_policy_exporter:
+    file: ./development/release/objectstore-policies/exporter.json
+  objectstore_policy_query:
+    file: ./development/release/objectstore-policies/query.json
+  objectstore_policy_gc:
+    file: ./development/release/objectstore-policies/gc.json
+
+volumes:
+  objectstore_data:
+  ui_node_modules:
+  cargo_target:

@@ -1,0 +1,211 @@
+/*
+ * Help (route /help) — the local operator guide.
+ *
+ * Order: page header, Common workflows (a two-column card grid), then
+ * Keyboard shortcuts beside Terms. Panels use the shared panel heading over
+ * a divider. Semantic tokens only; no gradients, glow, blur, or decorative
+ * shadows.
+ */
+
+.rv-help-page {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--rv-space-5);
+  min-width: 0;
+  color: var(--rv-text);
+  font-family: var(--rv-font-sans);
+}
+
+.rv-help-page *,
+.rv-help-page *::before,
+.rv-help-page *::after {
+  box-sizing: border-box;
+}
+
+.rv-help-page :focus-visible {
+  outline: 2px solid var(--rv-accent);
+  outline-offset: 2px;
+}
+
+.rv-help-page .rv-help-section {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.rv-help-section__head {
+  padding: var(--rv-space-4);
+  border-bottom: 1px solid var(--rv-line);
+}
+
+.rv-help-section__head h2 {
+  margin-top: 2px;
+}
+
+/* ---- workflows --------------------------------------------------------- */
+
+.rv-help-workflows-frame {
+  container-type: inline-size;
+}
+
+/* Two columns when each card gets about 20rem; one column otherwise. */
+.rv-help-page .rv-help-workflows {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1px;
+  background: var(--rv-line);
+}
+
+.rv-help-page .rv-help-workflows article {
+  min-width: 0;
+  border-top: 0;
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  align-items: start;
+  gap: var(--rv-space-3);
+  padding: var(--rv-space-4);
+  background: var(--rv-surface);
+}
+
+@container (min-width: 40rem) {
+  .rv-help-page .rv-help-workflows { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* An odd last card spans the row so no empty line-coloured cell remains. */
+.rv-help-workflows article:last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+}
+
+.rv-help-workflows__icon {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--rv-line-strong);
+  border-radius: var(--radius-md);
+  background: var(--rv-surface-raised);
+  color: var(--rv-accent);
+}
+
+.rv-help-workflows h3 {
+  margin: 0;
+  color: var(--rv-text);
+  font-size: var(--rv-type-body);
+  font-weight: var(--rv-weight-semibold);
+  line-height: var(--rv-leading-body);
+}
+
+.rv-help-workflows p {
+  max-width: 65ch;
+  margin: var(--rv-space-1) 0 0;
+  color: var(--rv-muted);
+  font-size: var(--rv-type-body);
+  line-height: var(--rv-leading-body);
+}
+
+.rv-help-page .rv-help-workflows a {
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: var(--rv-space-2);
+  border-radius: var(--radius-sm);
+  color: var(--rv-accent-text);
+  font-size: var(--rv-type-ui);
+  font-weight: var(--rv-weight-medium);
+  line-height: var(--rv-leading-ui);
+  text-decoration: none;
+  text-underline-offset: 3px;
+}
+
+.rv-help-workflows a:hover {
+  text-decoration: underline;
+}
+
+/* ---- shortcuts and terms ----------------------------------------------- */
+
+.rv-help-reference {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(26rem, 100%), 1fr));
+  align-items: start;
+  gap: var(--rv-space-5);
+}
+
+.rv-help-definitions {
+  margin: 0;
+}
+
+.rv-help-page .rv-help-definitions > div {
+  display: grid;
+  grid-template-columns: minmax(7.5rem, .4fr) minmax(0, 1fr);
+  align-items: baseline;
+  gap: var(--rv-space-4);
+  padding: var(--rv-space-3) var(--rv-space-4);
+  border-top: 1px solid var(--rv-line);
+}
+
+.rv-help-page .rv-help-definitions > div:first-child {
+  border-top: 0;
+}
+
+.rv-help-definitions dt {
+  color: var(--rv-text);
+  font-size: var(--rv-type-ui);
+  font-weight: var(--rv-weight-semibold);
+  line-height: var(--rv-leading-ui);
+}
+
+.rv-help-page .rv-help-definitions.is-keys > div {
+  grid-template-columns: minmax(12.5rem, .45fr) minmax(0, 1fr);
+}
+
+.rv-help-definitions.is-keys dt {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--rv-space-1);
+  color: var(--rv-muted);
+  font-weight: var(--rv-weight-regular);
+}
+
+.rv-help-definitions dd {
+  margin: 0;
+  color: var(--rv-muted);
+  font-size: var(--rv-type-body);
+  line-height: var(--rv-leading-body);
+}
+
+.rv-help-page .rv-help-definitions kbd {
+  min-width: 24px;
+  min-height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 6px;
+  border: 1px solid var(--rv-line-strong);
+  border-bottom-color: var(--rv-control-border);
+  border-radius: var(--radius-sm);
+  background: var(--rv-surface-raised);
+  color: var(--rv-text);
+  font-family: var(--rv-font-mono);
+  font-size: var(--rv-type-caption);
+  font-weight: var(--rv-weight-medium);
+  line-height: var(--rv-leading-caption);
+}
+
+/* ---- responsive -------------------------------------------------------- */
+
+@media (max-width: 700px) {
+  .rv-help-page .rv-help-workflows a {
+    min-height: 44px;
+  }
+}
+
+@media (max-width: 460px) {
+  .rv-help-page .rv-help-definitions > div,
+  .rv-help-page .rv-help-definitions.is-keys > div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--rv-space-1);
+  }
+}

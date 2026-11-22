@@ -1,0 +1,50 @@
+[Unit]
+Description=Robot Vault upload agent (scan -> hash -> upload)
+Documentation=https://docs.ingotron.com/robot
+After=network-online.target
+Wants=network-online.target
+ConditionPathExists=/etc/ingotron/credentials/robot.token
+
+[Service]
+Type=oneshot
+User=ingotron
+Group=ingotron
+ExecStart=/opt/ingotron-agent/current/bin/ingotron-agent-run
+# The wedge bound. On a oneshot this is TimeoutStartSec, NOT RuntimeMaxSec.
+#
+# RuntimeMaxSec is not set, not even alongside. A oneshot spends its whole
+# life in "activating", which TimeoutStartSec bounds and RuntimeMaxSec does
+# not; systemd 249 answers
+# "RuntimeMaxSec= has no effect in combination with Type=oneshot. Ignoring."
+# An inert directive is worse than an absent one -- it reads as a guarantee,
+# and a whitelist kept to silence its warning maintains the illusion. Without a
+# real bound a hung agent would hold its flock and skip every subsequent timer
+# run forever, which is the failure the bound exists to stop.
+TimeoutStartSec=3h
+WorkingDirectory=/var/lib/ingotron
+EnvironmentFile=-/etc/ingotron/agent.env
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ingotron-agent
+UMask=0077
+
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadOnlyPaths=/etc/ingotron
+ReadWritePaths=/var/lib/ingotron
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources
+CapabilityBoundingSet=

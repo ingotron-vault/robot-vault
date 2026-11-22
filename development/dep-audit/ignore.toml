@@ -1,0 +1,30 @@
+# Reviewed exceptions for `make dep-audit` (see docs/TESTING.md).
+#
+# Add an entry only when a fixable High or Critical finding cannot be fixed by
+# a lock-file bump now, or cannot be exploited in Robot Vault. Each entry needs:
+#
+#   id        advisory identifier from the report (GHSA-, CVE-, RUSTSEC-, PYSEC-)
+#   package   package name as the report shows it
+#   lock      optional: limit the exception to one repository-relative lock file
+#   reason    why the finding is not fixed or not exploitable here (8+ words)
+#   reviewed  date of the review (YYYY-MM-DD, not quoted)
+#   expires   review-by date, at most 90 days after `reviewed`
+#
+# An expired entry stops working, so the finding fails the gate again. Review
+# it, then fix the dependency or renew the entry with a new reviewed date.
+
+[[ignore]]
+id = "GHSA-82j2-j2ch-gfr8"
+package = "rustls-webpki"
+lock = "phases/03-ingest-server-rs/Cargo.lock"
+reason = """
+Denial of service only when an application passes RevocationOptions and parses
+attacker-supplied CRL bytes. The ingest server never loads CRLs: tonic 0.11
+builds its client verifier without revocation options, and the AWS SDK client
+uses the default rustls configuration. The fixed 0.103.13 needs rustls 0.23,
+so 0.101.7 (aws-smithy legacy rustls 0.21) and 0.102.8 (tonic 0.11) go away
+only with a tonic 0.12+ upgrade and an AWS SDK TLS feature change in
+Cargo.toml, not with a lock-file bump.
+"""
+reviewed = 2026-10-08
+expires = 2027-01-06

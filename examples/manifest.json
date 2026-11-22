@@ -1,0 +1,44 @@
+{
+  "bags": [
+    {
+      "bytes": 509376,
+      "datacard": "wheeled-nominal.datacard.md",
+      "file": "wheeled-nominal.mcap",
+      "label": "wheeled-nominal",
+      "message_count": 277,
+      "sha256": "bf17ae1eeaa6c5b27c842b68d8a2f4336b5e7c18c16dba94263426bf2a1703ef",
+      "sidecar": "wheeled-nominal.json"
+    },
+    {
+      "bytes": 55332,
+      "datacard": "manipulator-pickplace.datacard.md",
+      "file": "manipulator-pickplace.mcap",
+      "label": "manipulator-pickplace",
+      "message_count": 1001,
+      "sha256": "48c41711e8fea121af012df9abab373f9f433ea2a528354d7812eaa1093263af",
+      "sidecar": "manipulator-pickplace.json"
+    },
+    {
+      "bytes": 214866,
+      "datacard": "imperfect-run.datacard.md",
+      "file": "imperfect-run.mcap",
+      "label": "imperfect-run",
+      "message_count": 207,
+      "sha256": "a21dead075e4598844e584aac13d641bce13321c10343aaa87559481d4442511",
+      "sidecar": "imperfect-run.json"
+    },
+    {
+      "bytes": 1831279,
+      "datacard": "pii-bearing.datacard.md",
+      "file": "pii-bearing.mcap",
+      "label": "pii-bearing",
+      "message_count": 1162,
+      "sha256": "787c87fe25238a423631cd3da2902ac4b389aa224fa8ecde4ec87aa9e9f22051",
+      "sidecar": "pii-bearing.json"
+    }
+  ],
+  "example_data_version": 1,
+  "generator": "PYTHONPATH=development python3 -m example_data",
+  "schema": "robot-vault-example-bundle/v1",
+  "total_bytes": 2610853
+}

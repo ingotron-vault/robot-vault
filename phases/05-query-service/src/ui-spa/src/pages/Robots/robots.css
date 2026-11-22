@@ -1,0 +1,673 @@
+/*
+ * Robots (route /robots) — fleet registry and robot detail.
+ *
+ * Order: page header, provisioning notices, then the workspace. The workspace
+ * is the Fleet table (dominant, flex-grow 999) and the Robot detail panel.
+ * They sit side by side when the content column is wide enough for both basis
+ * widths, and the panel stacks below the table otherwise, as on Uploads.
+ * Semantic tokens only; no gradients, glow, blur, or decorative shadows.
+ */
+
+.rv-robots {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rv-space-5);
+  min-width: 0;
+  color: var(--rv-text);
+  font-family: var(--rv-font-sans);
+}
+
+.rv-robots *,
+.rv-robots *::before,
+.rv-robots *::after {
+  box-sizing: border-box;
+}
+
+.rv-robots :focus-visible {
+  outline: 2px solid var(--rv-accent);
+  outline-offset: 2px;
+}
+
+.rv-robots .is-mono,
+.rv-robots-cell-mono {
+  font-family: var(--rv-font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.rv-robots-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.rv-robots-kicker {
+  margin: 0;
+  color: var(--rv-dim);
+  font-family: var(--rv-font-mono);
+  font-size: var(--rv-type-caption);
+  font-weight: var(--rv-weight-medium);
+  letter-spacing: var(--rv-tracking-label);
+  line-height: var(--rv-leading-caption);
+  text-transform: uppercase;
+}
+
+.rv-robots-alert.rv-robots-action-failure {
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+/* ---------- Workspace: Fleet table + Robot detail ---------- */
+
+.rv-robots-workspace {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--rv-space-5);
+  min-width: 0;
+}
+
+.rv-robots-panel {
+  min-width: 0;
+  border: 1px solid var(--rv-line);
+  border-radius: var(--radius-lg);
+  background: var(--rv-surface);
+  scroll-margin-top: var(--rv-space-6);
+}
+
+.rv-robots-registry {
+  display: flex;
+  flex: 999 1 770px;
+  flex-direction: column;
+}
+
+.rv-robots-inspector {
+  display: flex;
+  flex: 1 1 320px;
+  flex-direction: column;
+}
+
+.rv-robots-panel__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--rv-space-2) var(--rv-space-4);
+  padding: var(--rv-space-3) var(--rv-space-4);
+  border-bottom: 1px solid var(--rv-line);
+}
+
+.rv-robots-panel__head h2 {
+  margin: 0;
+  font-size: var(--rv-type-title-sm);
+  font-weight: var(--rv-weight-semibold);
+  letter-spacing: var(--rv-tracking-heading);
+  line-height: var(--rv-leading-title-sm);
+}
+
+.rv-robots-panel__meta {
+  margin: var(--rv-space-1) 0 0;
+  color: var(--rv-dim);
+  font-size: var(--rv-type-caption);
+  line-height: var(--rv-leading-caption);
+}
+
+.rv-robots-count {
+  color: var(--rv-dim);
+  font-family: var(--rv-font-mono);
+  font-size: var(--rv-type-caption);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--rv-leading-caption);
+}
+
+.rv-robots-state {
+  min-height: 120px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--rv-space-3);
+  padding: var(--rv-space-4);
+  text-align: center;
+  color: var(--rv-muted);
+  font-size: var(--rv-type-body);
+  line-height: var(--rv-leading-body);
+}
+
+.rv-robots-state.is-error {
+  color: var(--rv-red);
+}
+
+.rv-robots-detail .rv-robots-state {
+  min-height: 0;
+  align-items: flex-start;
+  padding: 0;
+  text-align: left;
+}
+
+.rv-robots-state code,
+.rv-robots-note code {
+  padding: 1px 5px;
+  border: 1px solid var(--rv-line);
+  border-radius: 4px;
+  background: var(--rv-surface-raised);
+  color: var(--rv-text);
+  font-family: var(--rv-font-mono);
+  font-size: var(--rv-type-caption);
+  line-height: var(--rv-leading-caption);
+  overflow-wrap: anywhere;
+}
+
+/* ---------- Fleet table ---------- */
+
+/* Irreducibly tabular: the table scrolls inside its own box, the page does not. */
+.rv-robots-table-wrap {
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.rv-robots-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.rv-robots-table th[scope="col"] {
+  height: 38px;
+  padding: 0 var(--rv-space-2);
+  border-bottom: 1px solid var(--rv-line);
+  background: var(--rv-table-head);
+  color: var(--rv-dim);
+  font-family: var(--rv-font-mono);
+  font-size: var(--rv-type-caption);
+  font-weight: var(--rv-weight-medium);
+  letter-spacing: var(--rv-tracking-label);
+  line-height: var(--rv-leading-caption);
+  text-align: left;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.rv-robots-table td,
+.rv-robots-table th[scope="row"] {
+  height: 52px;
+  padding: var(--rv-space-2);
+  border-bottom: 1px solid var(--rv-line);
+  color: var(--rv-muted);
+  font-size: var(--rv-type-ui);
+  font-weight: var(--rv-weight-regular);
+  line-height: var(--rv-leading-ui);
+  text-align: left;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.rv-robots-table th:first-child,
+.rv-robots-table td:first-child {
+  padding-left: var(--rv-space-4);
+}
+
+.rv-robots-table th:last-child,
+.rv-robots-table td:last-child {
+  padding-right: var(--rv-space-4);
+}
+
+.rv-robots-table tbody tr:last-child td,
+.rv-robots-table tbody tr:last-child th[scope="row"] {
+  border-bottom: 0;
+}
+
+.rv-robots-table tbody tr:hover td,
+.rv-robots-table tbody tr:hover th[scope="row"] {
+  background: var(--rv-table-row-hover);
+}
+
+/* Selected: the tinted surface plus an accent bar, and `aria-expanded` on the robot button. */
+.rv-robots-table tbody tr[data-selected="yes"] td,
+.rv-robots-table tbody tr[data-selected="yes"] th[scope="row"] {
+  background: var(--rv-surface-selected);
+}
+
+.rv-robots-table tbody tr[data-selected="yes"] th[scope="row"] {
+  box-shadow: inset 2px 0 0 var(--rv-accent);
+}
+
+.rv-robots-table .is-numeric {
+  text-align: right;
+}
+
+.rv-robots-table td.is-numeric .rv-robots-cell-mono {
+  color: var(--rv-text);
+  font-size: var(--rv-type-caption);
+  line-height: var(--rv-leading-caption);
+}
+
+.rv-robots-table th[scope="row"] small {
+  display: block;
+  max-width: 22ch;
+  margin-top: 2px;
+  overflow: hidden;
+  color: var(--rv-dim);
+  font-size: var(--rv-type-caption);
+  font-weight: var(--rv-weight-regular);
+  line-height: var(--rv-leading-caption);
+  text-overflow: ellipsis;
+}
+
+.rv-robots-link {
+  display: inline-flex;
+  align-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--rv-text);
+  font-family: var(--rv-font-sans);
+  font-size: var(--rv-type-ui);
+  font-weight: var(--rv-weight-semibold);
+  line-height: var(--rv-leading-ui);
+  cursor: pointer;
+  text-align: left;
+  text-decoration: underline;
+  text-decoration-color: var(--rv-line-strong);
+  text-underline-offset: 3px;
+}
+
+.rv-robots-link .is-mono {
+  font-size: var(--rv-type-ui);
+  line-height: var(--rv-leading-ui);
+}
+
+.rv-robots-link:hover,
+.rv-robots-link[aria-expanded="true"] {
+  color: var(--rv-accent-text);
+  text-decoration-color: currentColor;
+}
+
+/* Explanatory notes in a cell are prose: dim sans, never mono. */
+.rv-robots-unavailable {
+  color: var(--rv-dim);
+  font-size: var(--rv-type-caption);
+  line-height: var(--rv-leading-caption);
+}
+
+.rv-robots-table .rv-robots-cell-sub {
+  display: block;
+  margin-top: 2px;
+  color: var(--rv-dim);
+  font-family: var(--rv-font-mono);
+  font-size: var(--rv-type-caption);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--rv-leading-caption);
+}
+
+/* One line of buttons; the column never squeezes them onto two lines. */
+.rv-robots-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--rv-space-2);
+  width: max-content;
+}
+
+.rv-robots-row-actions > button {
+  min-height: 32px;
+  gap: 6px;
+  padding: 0 var(--rv-space-2);
+  border-radius: var(--radius-sm);
+  font-size: var(--rv-type-ui);
+  line-height: var(--rv-leading-ui);
+}
+
+/* The terminal note wraps to the buttons' width instead of widening the column. */
+.rv-robots-row-actions > .rv-robots-note {
+  flex: 1 0 100%;
+  contain: inline-size;
+  white-space: normal;
+}
+
+/*
+ * The label is the state word itself, so the chip reads without its colour --
+ * the tone and dot are reinforcement, never the only signal.
+ */
+.rv-robots-chip {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--rv-space-2);
+  min-height: 22px;
+  padding: 0 var(--rv-space-2);
+  border: 1px solid var(--rv-line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--rv-surface-subtle);
+  color: var(--rv-muted);
+  font-size: var(--rv-type-caption);
+  font-weight: var(--rv-weight-medium);
+  line-height: var(--rv-leading-caption);
+  white-space: nowrap;
+}
+
+.rv-robots-chip > i {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.rv-robots-chip__label {
+  text-transform: capitalize;
+}
+
+.rv-robots-chip[data-tone="success"] { border-color: var(--rv-green-line); background: var(--rv-green-soft); color: var(--rv-green); }
+.rv-robots-chip[data-tone="warning"] { border-color: var(--rv-amber-line); background: var(--rv-amber-soft); color: var(--rv-amber); }
+.rv-robots-chip[data-tone="danger"] { border-color: var(--rv-red-line); background: var(--rv-red-soft); color: var(--rv-red); }
+
+/* ---------- Robot detail panel ---------- */
+
+.rv-robots-inspector > * + * {
+  border-top: 1px solid var(--rv-line);
+}
+
+.rv-robots-inspector__head {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--rv-space-1);
+  padding: var(--rv-space-4);
+}
+
+.rv-robots-inspector__head h2 {
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--rv-text);
+  font-size: var(--rv-type-body);
+  font-weight: var(--rv-weight-medium);
+  line-height: var(--rv-leading-body);
+}
+
+.rv-robots-inspector__head h2.is-mono {
+  font-family: var(--rv-font-mono);
+}
+
+.rv-robots-inspector__name {
+  margin: 0 0 var(--rv-space-1);
+  color: var(--rv-muted);
+  font-size: var(--rv-type-caption);
+  line-height: var(--rv-leading-caption);
+}
+
+.rv-robots-inspector__empty {
+  margin: 0;
+  padding: var(--rv-space-4);
+  color: var(--rv-muted);
+  font-size: var(--rv-type-ui);
+  line-height: var(--rv-leading-ui);
+}
+
+.rv-robots-detail {
+  display: flex;
+  flex-direction: column;
+}
+
+.rv-robots-detail > div:not(.rv-robots-detail__grid) {
+  margin: var(--rv-space-4) var(--rv-space-4) 0;
+}
+
+/* One column beside the table; two columns when the panel stacks full width below it. */
+.rv-robots-detail__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+}
+
+.rv-robots-detail__grid > section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rv-space-3);
+  min-width: 0;
+  padding: var(--rv-space-4);
+  border-top: 1px solid var(--rv-line);
+}
+
+.rv-robots-detail__grid > section:first-child {
+  border-top: 0;
+}
+
+.rv-robots-detail > div:not(.rv-robots-detail__grid) + .rv-robots-detail__grid > section:first-child {
+  margin-top: var(--rv-space-4);
+  border-top: 1px solid var(--rv-line);
+}
+
+.rv-robots-detail__grid h3 {
+  margin: 0;
+  color: var(--rv-dim);
+  font-family: var(--rv-font-mono);
+  font-size: var(--rv-type-caption);
+  font-weight: var(--rv-weight-medium);
+  letter-spacing: var(--rv-tracking-label);
+  line-height: var(--rv-leading-caption);
+  text-transform: uppercase;
+}
+
+.rv-robots-creds,
+.rv-robots-uploads {
+  display: grid;
+  gap: var(--rv-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rv-robots-creds li,
+.rv-robots-uploads li {
+  display: grid;
+  gap: var(--rv-space-1);
+  min-width: 0;
+  padding: var(--rv-space-2) var(--rv-space-3);
+  border: 1px solid var(--rv-line);
+  border-radius: var(--radius-md);
+  background: var(--rv-surface-inset);
+}
+
+.rv-robots-creds li > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--rv-space-2);
+}
+
+.rv-robots-creds li > div > .is-mono,
+.rv-robots-uploads li > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--rv-text);
+  font-size: var(--rv-type-ui);
+  font-weight: var(--rv-weight-medium);
+  line-height: var(--rv-leading-ui);
+}
+
+.rv-robots-creds li > div > .is-mono {
+  font-size: var(--rv-type-caption);
+  line-height: var(--rv-leading-caption);
+}
+
+.rv-robots-creds li > button {
+  justify-self: start;
+  min-height: 32px;
+  margin-top: var(--rv-space-1);
+  padding: 0 var(--rv-space-3);
+  border-radius: var(--radius-sm);
+  font-size: var(--rv-type-ui);
+  line-height: var(--rv-leading-ui);
+}
+
+.rv-robots-creds small {
+  display: block;
+}
+
+.rv-robots-creds small,
+.rv-robots-uploads small {
+  color: var(--rv-dim);
+  font-size: var(--rv-type-caption);
+  line-height: var(--rv-leading-caption);
+  overflow-wrap: anywhere;
+}
+
+.rv-robots-uploads small.is-mono {
+  font-family: var(--rv-font-mono);
+}
+
+.rv-robots-note {
+  display: flex;
+  align-items: center;
+  gap: var(--rv-space-2);
+  margin: 0;
+  color: var(--rv-dim);
+  font-size: var(--rv-type-caption);
+  line-height: var(--rv-leading-caption);
+}
+
+.rv-robots-field .rv-robots-note,
+.rv-robots-code .rv-robots-note {
+  display: block;
+}
+
+.rv-robots-copy {
+  margin: 0;
+  color: var(--rv-muted);
+  font-size: var(--rv-type-body);
+  line-height: var(--rv-leading-body);
+}
+
+.rv-robots-modal {
+  max-width: 640px;
+}
+
+.rv-robots-modal__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.rv-robots-form,
+.rv-robots-confirm,
+.rv-robots-code {
+  display: grid;
+  gap: 14px;
+}
+
+.rv-robots-field {
+  display: grid;
+  gap: 6px;
+}
+
+.rv-robots-field label {
+  color: var(--rv-text);
+  font-size: var(--rv-type-ui);
+  font-weight: var(--rv-weight-medium);
+  line-height: var(--rv-leading-ui);
+}
+
+.rv-robots-input {
+  min-height: 36px;
+  width: 100%;
+  padding: 0 10px;
+  border: 1px solid var(--rv-control-border);
+  border-radius: 6px;
+  background: var(--rv-surface-raised);
+  color: var(--rv-text);
+  font-family: var(--rv-font-sans);
+  font-size: var(--rv-type-body);
+  line-height: var(--rv-leading-body);
+}
+
+.rv-robots-input.is-mono {
+  font-family: var(--rv-font-mono);
+  font-size: var(--rv-type-body);
+}
+
+.rv-robots-input:focus-visible {
+  outline: 2px solid var(--rv-accent);
+  outline-offset: 1px;
+}
+
+.rv-robots-alert {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--rv-red-line);
+  border-radius: 8px;
+  background: var(--rv-red-soft);
+  color: var(--rv-red);
+  font-size: var(--rv-type-body);
+  line-height: var(--rv-leading-body);
+}
+
+.rv-robots-code__facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.rv-robots-code__facts dt {
+  color: var(--rv-dim);
+  font-family: var(--rv-font-mono);
+  font-size: var(--rv-type-caption);
+  letter-spacing: var(--rv-tracking-label);
+  line-height: var(--rv-leading-caption);
+  text-transform: uppercase;
+}
+
+.rv-robots-code__facts dd {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 3px 0 0;
+  color: var(--rv-text);
+  font-size: var(--rv-type-ui);
+  line-height: var(--rv-leading-ui);
+  overflow-wrap: anywhere;
+}
+
+.rv-robots-code__facts dd[data-tone="expiring"] {
+  color: var(--rv-amber);
+}
+
+.rv-robots-code__facts dd[data-tone="expired"] {
+  color: var(--rv-red);
+}
+
+@media (max-width: 700px) {
+  .rv-robots-registry,
+  .rv-robots-inspector {
+    flex-basis: 100%;
+  }
+
+  .rv-robots-code__facts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* The shell gives every button in the content column a 44px minimum here.
+     The robot button keeps its text box and grows its hit area instead, so
+     the robot name and its display name stay together. */
+  .rv-robots .rv-robots-link {
+    position: relative;
+    min-height: 0;
+  }
+
+  .rv-robots-link::after {
+    content: "";
+    position: absolute;
+    inset: -13px -8px;
+  }
+}

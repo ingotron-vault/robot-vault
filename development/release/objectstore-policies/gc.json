@@ -1,0 +1,63 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "BucketMetadata",
+      "Effect": "Allow",
+      "Action": "s3:GetBucketLocation",
+      "Resource": "arn:aws:s3:::__ROBOT_VAULT_BUCKET__"
+    },
+    {
+      "Sid": "ListManagedNamespaces",
+      "Effect": "Allow",
+      "Action": "s3:ListBucket",
+      "Resource": "arn:aws:s3:::__ROBOT_VAULT_BUCKET__",
+      "Condition": {
+        "StringLike": {
+          "s3:prefix": [
+            "raw/*",
+            "manifests/*",
+            "processed/parquet/*",
+            "cas/files/*",
+            "processed/media/*",
+            "qa/reports/*",
+            "exports/*"
+          ]
+        }
+      }
+    },
+    {
+      "Sid": "DiscoverIncompleteMultipartUploads",
+      "Effect": "Allow",
+      "Action": "s3:ListBucketMultipartUploads",
+      "Resource": "arn:aws:s3:::__ROBOT_VAULT_BUCKET__"
+    },
+    {
+      "Sid": "DeleteRegistryCoveredObjects",
+      "Effect": "Allow",
+      "Action": "s3:DeleteObject",
+      "Resource": [
+        "arn:aws:s3:::__ROBOT_VAULT_BUCKET__/raw/*",
+        "arn:aws:s3:::__ROBOT_VAULT_BUCKET__/manifests/*",
+        "arn:aws:s3:::__ROBOT_VAULT_BUCKET__/processed/parquet/*",
+        "arn:aws:s3:::__ROBOT_VAULT_BUCKET__/processed/media/*",
+        "arn:aws:s3:::__ROBOT_VAULT_BUCKET__/qa/reports/*",
+        "arn:aws:s3:::__ROBOT_VAULT_BUCKET__/exports/*"
+      ]
+    },
+    {
+      "Sid": "AbortManagedMultipartUploads",
+      "Effect": "Allow",
+      "Action": "s3:AbortMultipartUpload",
+      "Resource": [
+        "arn:aws:s3:::__ROBOT_VAULT_BUCKET__/raw/*",
+        "arn:aws:s3:::__ROBOT_VAULT_BUCKET__/manifests/*",
+        "arn:aws:s3:::__ROBOT_VAULT_BUCKET__/processed/parquet/*",
+        "arn:aws:s3:::__ROBOT_VAULT_BUCKET__/cas/files/*",
+        "arn:aws:s3:::__ROBOT_VAULT_BUCKET__/processed/media/*",
+        "arn:aws:s3:::__ROBOT_VAULT_BUCKET__/qa/reports/*",
+        "arn:aws:s3:::__ROBOT_VAULT_BUCKET__/exports/*"
+      ]
+    }
+  ]
+}

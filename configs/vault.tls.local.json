@@ -1,0 +1,31 @@
+{
+  "robot_id": "demo",
+  "paths": {
+    "robot_root": "/robot_data",
+    "extension": ".mcap"
+  },
+  "retention": {
+    "min_retain_days": 14,
+    "max_total_gib": 200
+  },
+  "upload_agent": {
+    "concurrency": 2,
+    "bandwidth_mbps": 0,
+    "chunk_size_bytes": 5242880,
+    "parallel_streams": 2,
+    "max_retries": 3,
+    "base_backoff_seconds": 1.0,
+    "small_file_threshold_mb": 4
+  },
+  "server": {
+    "host": "ingest",
+    "port": 50051
+  },
+  "tls": {
+    "enabled": true,
+    "mtls": true,
+    "ca_path": "/app/certs/ca.crt",
+    "cert_path": "/app/certs/robot.crt",
+    "key_path": "/app/certs/robot.key"
+  }
+}

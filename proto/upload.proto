@@ -1,0 +1,213 @@
+syntax = "proto3";
+package robotics.upload.v1;
+
+import "google/protobuf/timestamp.proto";
+
+// ============================================================================
+// Canonical UploadStatus vocabulary
+// ============================================================================
+// Every `string status` field in this file carries ONE of these values, and
+// nothing else:
+//
+//   "pending"    - known to the robot, not yet handed to the server.
+//                  Robot-manifest-only; the server never returns it.
+//   "uploading"  - bytes in flight; the server has a row but no complete
+//                  object yet.
+//   "completed"  - the object is stored and verified against the client's
+//                  expected_sha256. THE ONLY SUCCESS VALUE.
+//   "failed"     - the attempt ended badly; the file may be retried.
+//   "unknown"    - wire-only sentinel: the server holds no row for the
+//                  requested upload_id. Never persisted.
+//
+// The same list lives in exactly two other places, and all three must agree:
+//   * phases/common-config/src/robot_vault_config/upload_status.py  (the enum
+//     every Python phase imports)
+//   * db/migrations/001_baseline.sql  (the CHECK constraint on
+//     uploads.status; it enforces the four persisted values, not "unknown")
+//
+// WHY A STRING AND NOT A PROTO ENUM: switching `status` to an enum changes its
+// wire type from length-delimited (2) to varint (0) on the SAME field number.
+// Any peer built against the other version then fails to parse the message —
+// and a rolling rebuild of this stack always has a window where the Rust
+// ingest server and a Python `rua` client are on different proto revisions
+// (the dev image bakes stubs at build time; the robot/seed/dev services
+// bind-mount the repo over them). Uploads would break for the duration.
+// Canonicalizing the string VALUES buys the same single vocabulary at zero
+// wire risk, so that is what this file does.
+// ============================================================================
+
+// ============================================================================
+// Capture-metadata intake
+// ============================================================================
+// `UploadMetadata` fields 11-15 (`operator`, `site`, `permission_ref`,
+// `session_tags`, `task_label`) are optional per-session context, declared
+// once by a robot operator in `vault.json`'s `capture` section and carried
+// end-to-end: robot config -> manifest (robot_storage_manager/core.py) ->
+// this message (robot_upload_agent/transport.py) -> the ingest server's
+// `uploads` table columns (main.rs) -> the query API
+// (query_service/uploads.py). Field numbers 6, 8 and 9 are unused.
+//
+// All five are `string`, never a proto enum, for exactly the wire-compat
+// reason documented above for `status`: switching a field to an enum flips
+// its wire type from length-delimited (2) to varint (0) on the SAME field
+// number, and a rolling rebuild of this stack always has a window where the
+// Rust ingest server and a Python `rua` client are on different proto
+// revisions. An enum peer reading a string-typed value written by the other
+// revision (or vice versa) fails to parse the whole message, not just this
+// field. Proto3 defaults every unset string field to `""`, so a robot whose
+// config carries no `capture` section sends `""` for all five, which the
+// ingest server stores as SQL NULL -- never a wire-level absence/parse error.
+//
+// Field numbers only ever grow. Fields 16-18 negotiate durable multipart
+// resume; a future field takes 19. Existing fields are never renumbered.
+// ============================================================================
+
+// v2 baseline copy of UploadService contract (annotated in docs)
+service UploadService {
+  // Streaming upload for large files
+  rpc Upload(stream UploadRequest) returns (UploadResponse);
+  // Unary upload for small files: the WHOLE file rides in one gRPC message,
+  // so it is gated by upload_agent.small_file_threshold_mb, which is capped at
+  // 48 MB against the 50 MiB per-message limit both ends enforce.
+  rpc UploadSmall(UploadSmallRequest) returns (UploadResponse);
+  
+  // Get upload status
+  rpc GetUploadStatus(UploadStatusRequest) returns (UploadStatusResponse);
+  
+  // List uploads
+  rpc ListUploads(ListUploadsRequest) returns (ListUploadsResponse);
+  
+  // Negotiate durable multipart progress before streaming. Only
+  // resume_version=1 is accepted.
+  rpc ResumeUpload(ResumeUploadRequest) returns (ResumeUploadResponse);
+  
+  // Health check
+  rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
+}
+
+message UploadRequest {
+  oneof data {
+    UploadMetadata metadata = 1;  // First message
+    UploadChunk chunk = 2;        // Subsequent messages
+  }
+}
+
+message UploadMetadata {
+  string robot_id = 1;
+  string filename = 2;
+  int64 file_size = 3;
+  string content_type = 4;
+  map<string, string> labels = 5;
+  string upload_id = 7;  // Client-generated UUID for resumability
+  // Required for streaming Upload and UploadSmall in every security profile.
+  // The server reserves this digest with the immutable client_upload_id tuple
+  // before object I/O. Lowercase or uppercase hex is accepted on the wire; the
+  // server normalizes it to 64 lowercase hex characters.
+  string expected_sha256 = 10;
+  // Capture-metadata intake: optional per-session context set
+  // once by the operator in vault.json's `capture` section. See the header
+  // comment above for the wire-compat rationale and the field-number
+  // discipline (never renumber). Empty string
+  // ("") means "not set", the proto3 default -- never a
+  // sentinel value of its own.
+  string operator = 11;        // Operator/technician running this capture session.
+  string site = 12;            // Site/location identifier for this capture session.
+  string permission_ref = 13;  // Consent/authorization reference for this capture.
+  string session_tags = 14;    // Comma-separated free-text session tags.
+  string task_label = 15;      // Session-level LeRobot task label.
+  // Must be 1: streaming Upload reuses storage-confirmed multipart parts.
+  // All three fields must reflect the latest resume probe.
+  uint32 resume_version = 16;
+  int64 chunk_size_bytes = 17;  // Fixed part boundaries for the session.
+  string resume_session_id = 18; // Opaque generation token; empty for a new session.
+}
+
+message UploadChunk {
+  bytes data = 1;
+  int64 offset = 2;
+  string chunk_hash = 3;  // SHA256 of this chunk
+  bool is_final = 4;
+  int32 chunk_number = 5;
+}
+
+message UploadResponse {
+  string upload_id = 1;
+  string status = 2;  // canonical UploadStatus (see header): uploading | completed | failed
+  int64 bytes_received = 3;
+  string final_hash = 4;
+  google.protobuf.Timestamp completed_at = 5;
+  string storage_path = 6;
+  string error_message = 7;
+}
+
+message UploadStatusRequest {
+  string upload_id = 1;
+}
+
+message UploadStatusResponse {
+  string upload_id = 1;
+  string status = 2;  // canonical UploadStatus; "unknown" when no row exists
+  int64 bytes_received = 3;
+  int64 total_bytes = 4;
+  google.protobuf.Timestamp started_at = 5;
+  google.protobuf.Timestamp updated_at = 6;
+  string error_message = 7;
+}
+
+message ListUploadsRequest {
+  string robot_id = 1;  // Optional filter
+  int32 page_size = 2;
+  string page_token = 3;
+}
+
+message ListUploadsResponse {
+  repeated UploadInfo uploads = 1;
+  string next_page_token = 2;
+}
+
+message UploadInfo {
+  string upload_id = 1;
+  string robot_id = 2;
+  string filename = 3;
+  int64 file_size = 4;
+  string status = 5;  // canonical UploadStatus
+  google.protobuf.Timestamp created_at = 6;
+  google.protobuf.Timestamp completed_at = 7;
+  string storage_path = 8;
+}
+
+// Must be 1: the server returns durable part evidence. Any other value is
+// rejected with INVALID_ARGUMENT.
+message ResumeUploadRequest {
+  string upload_id = 1;
+  uint32 resume_version = 2;
+}
+
+// With version 1 and a nonempty session token, missing_chunks is the complete
+// zero-based set still needed, and bytes_received is the sum of part sizes
+// confirmed by storage AND committed in Postgres. It is not a byte offset.
+// An empty missing set means send metadata only to finish/recover completion.
+// With no session, token/size/bytes are empty/zero; send a complete first stream.
+message ResumeUploadResponse {
+  string upload_id = 1;
+  int64 bytes_received = 2;
+  string status = 3;  // canonical UploadStatus; "unknown" when no row exists
+  repeated int32 missing_chunks = 4;
+  uint32 resume_version = 5;
+  int64 chunk_size_bytes = 6;
+  string resume_session_id = 7;
+  google.protobuf.Timestamp expires_at = 8;
+}
+
+message HealthCheckRequest {}
+
+message HealthCheckResponse {
+  string status = 1;  // healthy, degraded, unhealthy
+  map<string, string> checks = 2;  // component -> status
+  google.protobuf.Timestamp timestamp = 3;
+}
+
+message UploadSmallRequest {
+  UploadMetadata metadata = 1;
+  bytes data = 2;                 // Entire file data
+}

@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "robot-vault-processor"
+version = "0.1.0"
+description = "MCAP to Parquet processor"
+readme = "docs/technical.md"
+requires-python = ">=3.12"
+dependencies = [
+    "pyarrow>=16.1",
+    "mcap>=1.2.1",
+    # The official, pure-Python ROS 2 MCAP decoder reads each record's
+    # embedded ros2msg schema. Keeping this exact avoids a ROS apt runtime and
+    # avoids decoding against a generated package that could drift from input.
+    "mcap-ros2-support==0.5.7",
+    "prometheus-client>=0.20",
+    "psycopg[binary]>=3.2",
+]
+
+[project.scripts]
+processor = "processor.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]

@@ -1,0 +1,918 @@
+/*
+ * Explore (route /explore, pipeline step 02).
+ *
+ * Order from most to least important: page header (with the Stream/SQL
+ * switch), one filter bar that holds the query window, its actions and saved
+ * views, then the workspace. Stream mode: one signal panel with a joined
+ * selection strip above the chart. SQL mode: console and results on the left,
+ * local history on the right when the content column is wide enough.
+ *
+ * Semantic tokens only. Panels: --rv-surface, 1px --rv-line, --radius-lg.
+ * Font properties use the --rv-type / --rv-weight / --rv-leading /
+ * --rv-tracking / --rv-font tokens (scripts/check-design-tokens.mjs).
+ */
+
+.rv-explore {
+  container: rv-explore / inline-size;
+  display: flex;
+  flex-direction: column;
+  gap: var(--rv-space-5);
+  min-width: 0;
+  color: var(--rv-text);
+  font-family: var(--rv-font-sans);
+}
+
+.rv-explore *,
+.rv-explore *::before,
+.rv-explore *::after {
+  box-sizing: border-box;
+}
+
+.rv-explore button,
+.rv-explore input,
+.rv-explore select,
+.rv-explore textarea {
+  font: inherit;
+}
+
+.rv-explore :focus-visible {
+  outline: 2px solid var(--rv-accent);
+  outline-offset: 2px;
+}
+
+.rv-explore .is-num {
+  text-align: right;
+}
+
+/* ---------- Header mode switch (ui-kit SegmentedControl) ---------- */
+
+.rv-explore .rv-explore__mode {
+  display: inline-flex;
+  gap: 2px;
+  height: 40px;
+  padding: 3px;
+  border: 1px solid var(--rv-control-border);
+  border-radius: var(--radius-md);
+  background: var(--rv-control-bg);
+}
+
+.rv-explore .rv-explore__mode > button {
+  min-width: 76px;
+  height: 32px;
+  padding: 0 var(--rv-space-4);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--rv-muted);
+  font-size: var(--rv-type-ui);
+  font-weight: var(--rv-weight-medium);
+  line-height: var(--rv-leading-ui);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 140ms ease, color 140ms ease;
+}
+
+.rv-explore .rv-explore__mode > button:hover {
+  background: var(--rv-surface-hover);
+  color: var(--rv-text);
+}
+
+.rv-explore .rv-explore__mode > button[aria-pressed="true"] {
+  background: var(--rv-surface-selected);
+  box-shadow: inset 0 0 0 1px var(--rv-accent-line);
+  color: var(--rv-text);
+}
+
+/* ---------- Feedback ---------- */
+
+.rv-explore__feedback {
+  margin: 0;
+  padding: var(--rv-space-2) var(--rv-space-3);
+  border: 1px solid var(--rv-line);
+  border-radius: var(--radius-md);
+  background: var(--rv-surface);
+  color: var(--rv-muted);
+  font-size: var(--rv-type-body);
+  line-height: var(--rv-leading-body);
+}
+
+.rv-explore__feedback.is-success {
+  border-color: var(--rv-green-line);
+  background: var(--rv-green-soft);
+  color: var(--rv-green);
+}
+
+.rv-explore__feedback.is-error {
+  border-color: var(--rv-red-line);
+  background: var(--rv-red-soft);
+  color: var(--rv-red);
+}
+
+/* ---------- Buttons (ui-kit Button, page sizing) ---------- */
+
+.rv-explore .rv-explore__btn {
+  min-height: 36px;
+  gap: 6px;
+  padding: 0 var(--rv-space-3);
+  border: 1px solid var(--rv-control-border);
+  border-radius: var(--radius-md);
+  background: var(--rv-control-bg);
+  color: var(--rv-text);
+  font-size: var(--rv-type-ui);
+  font-weight: var(--rv-weight-medium);
+  line-height: var(--rv-leading-ui);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.rv-explore .rv-explore__btn:hover {
+  background: var(--rv-control-hover);
+}
+
+.rv-explore .rv-explore__btn.is-primary {
+  border-color: var(--rv-accent);
+  background: var(--rv-accent);
+  color: var(--rv-on-accent);
+}
+
+.rv-explore .rv-explore__btn.is-primary:hover {
+  border-color: var(--rv-accent-hover);
+  background: var(--rv-accent-hover);
+  opacity: 1;
+}
+
+/* Disabled: no fill, dim label, quiet border. Fully opaque so the label stays
+ * readable, and pointer events stay on so the title hint still shows. */
+.rv-explore .rv-explore__btn:disabled,
+.rv-explore .rv-explore__btn.is-primary:disabled {
+  border-color: var(--rv-line-strong);
+  background: transparent;
+  color: var(--rv-dim);
+  opacity: 1;
+  pointer-events: auto;
+  cursor: not-allowed;
+}
+
+.rv-explore .rv-explore__btn[aria-busy="true"]:disabled {
+  cursor: progress;
+}
+
+/* ---------- Filter bar ---------- */
+
+.rv-explore__filters {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rv-space-4);
+  min-width: 0;
+  padding: var(--rv-space-4);
+  border: 1px solid var(--rv-line);
+  border-radius: var(--radius-lg);
+  background: var(--rv-surface);
+}
+
+.rv-explore__fields {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--rv-space-3) 14px;
+  min-width: 0;
+}
+
+.rv-explore__field {
+  display: flex;
+  flex: 1 1 160px;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.rv-explore__field.is-topic { flex: 2 1 240px; }
+.rv-explore__field.is-date { flex: 1 1 200px; }
+.rv-explore__field.is-bucket { flex: 0 1 140px; min-width: 120px; }
+
+.rv-explore__field > span {
+  color: var(--rv-muted);
+  font-size: var(--rv-type-caption);
+  font-weight: var(--rv-weight-medium);
+  line-height: var(--rv-leading-caption);
+}
+
+.rv-explore__field select,
+.rv-explore__field input {
+  width: 100%;
+  min-width: 0;
+  height: 40px;
+  padding: 0 var(--rv-space-3);
+  border: 1px solid var(--rv-control-border);
+  border-radius: var(--radius-md);
+  background: var(--rv-control-bg);
+  color: var(--rv-text);
+  font-size: var(--rv-type-ui);
+  line-height: var(--rv-leading-ui);
+  transition: border-color 140ms ease;
+}
+
+.rv-explore__field input {
+  font-family: var(--rv-font-mono);
+}
+
+.rv-explore__field select:hover,
+.rv-explore__field input:hover {
+  border-color: var(--rv-dim);
+}
+
+.rv-explore__field select:disabled {
+  border-color: var(--rv-line-strong);
+  color: var(--rv-dim);
+  cursor: not-allowed;
+}
+
+.rv-explore__source-error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--rv-space-2);
+  padding: var(--rv-space-2) var(--rv-space-3);
+  border: 1px solid var(--rv-red-line);
+  border-radius: var(--radius-md);
+  background: var(--rv-red-soft);
+  color: var(--rv-red);
+  font-size: var(--rv-type-body);
+  line-height: var(--rv-leading-body);
+}
+
+.rv-explore__source-error span {
+  margin-right: auto;
+}
+
+/* Actions: primary group, utilities, and the auto-refresh switch at the end. */
+.rv-explore__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--rv-space-2) var(--rv-space-4);
+  min-width: 0;
+}
+
+.rv-explore__toolbar-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--rv-space-2);
+  min-width: 0;
+}
+
+.rv-explore__filters > .rv-explore__toolbar {
+  padding-top: var(--rv-space-4);
+  border-top: 1px solid var(--rv-line);
+}
+
+.rv-explore__auto {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--rv-space-2);
+  min-height: 36px;
+  margin-left: auto;
+  padding: 0 var(--rv-space-3);
+  border: 1px solid var(--rv-control-border);
+  border-radius: var(--radius-md);
+  background: var(--rv-control-bg);
+  color: var(--rv-text);
+  font-size: var(--rv-type-ui);
+  font-weight: var(--rv-weight-medium);
+  line-height: var(--rv-leading-ui);
+  cursor: pointer;
+}
+
+.rv-explore__auto input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--rv-accent);
+  cursor: pointer;
+}
+
+.rv-explore__auto:has(input:checked) {
+  border-color: var(--rv-accent-line);
+  background: var(--rv-surface-selected);
+}
+
+/* Saved-view editor. */
+.rv-explore__save-form {
+  display: grid;
+  grid-template-columns: auto minmax(180px, 1fr) auto auto;
+  align-items: center;
+  gap: var(--rv-space-2);
+  padding-top: var(--rv-space-4);
+  border-top: 1px solid var(--rv-line);
+}
+
+.rv-explore__save-form label {
+  color: var(--rv-muted);
+  font-size: var(--rv-type-caption);
+  font-weight: var(--rv-weight-medium);
+  line-height: var(--rv-leading-caption);
+}
+
+.rv-explore__save-form input {
+  width: 100%;
+  min-width: 0;
+  height: 36px;
+  padding: 0 var(--rv-space-3);
+  border: 1px solid var(--rv-control-border);
+  border-radius: var(--radius-md);
+  background: var(--rv-control-bg);
+  color: var(--rv-text);
+  font-size: var(--rv-type-ui);
+  line-height: var(--rv-leading-ui);
+}
+
+.rv-explore__confirm {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--rv-space-2);
+  padding: var(--rv-space-2) var(--rv-space-3);
+  border: 1px solid var(--rv-amber-line);
+  border-radius: var(--radius-md);
+  background: var(--rv-amber-soft);
+  color: var(--rv-amber);
+  font-size: var(--rv-type-body);
+  line-height: var(--rv-leading-body);
+}
+
+.rv-explore__confirm span {
+  margin-right: auto;
+}
+
+/* Saved views: one row of joined chips under the actions. */
+.rv-explore__saved {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--rv-space-2);
+  padding-top: var(--rv-space-4);
+  border-top: 1px solid var(--rv-line);
+}
+
+.rv-explore__saved-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: var(--rv-space-1);
+  color: var(--rv-muted);
+  font-size: var(--rv-type-caption);
+  font-weight: var(--rv-weight-medium);
+  line-height: var(--rv-leading-caption);
+}
+
+.rv-explore__saved-item {
+  display: inline-flex;
+  align-items: stretch;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--rv-control-border);
+  border-radius: var(--radius-md);
+  background: var(--rv-control-bg);
+}
+
+.rv-explore__saved-item button {
+  min-height: 32px;
+  padding: 0 10px;
+  border: 0;
+  border-left: 1px solid var(--rv-line-strong);
+  background: transparent;
+  color: var(--rv-muted);
+  font-size: var(--rv-type-caption);
+  line-height: var(--rv-leading-caption);
+  cursor: pointer;
+  transition: background-color 140ms ease, color 140ms ease;
+}
+
+.rv-explore__saved-item button:first-child {
+  border-left: 0;
+}
+
+.rv-explore__saved-item button:hover {
+  background: var(--rv-surface-hover);
+  color: var(--rv-text);
+}
+
+.rv-explore__saved-item .rv-explore__saved-name {
+  color: var(--rv-text);
+  font-size: var(--rv-type-ui);
+  font-weight: var(--rv-weight-medium);
+  line-height: var(--rv-leading-ui);
+}
+
+.rv-explore__saved-item button.is-danger {
+  background: var(--rv-red-soft);
+  color: var(--rv-red);
+}
+
+/* ---------- Panels ---------- */
+
+.rv-explore__panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.rv-explore__panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--rv-space-3);
+  padding: var(--rv-space-4);
+  border-bottom: 1px solid var(--rv-line);
+}
+
+.rv-explore__panel-head > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.rv-explore__panel-head h2 {
+  margin: 0;
+  color: var(--rv-text);
+  font-size: var(--rv-type-title-sm);
+  font-weight: var(--rv-weight-semibold);
+  letter-spacing: var(--rv-tracking-heading);
+  line-height: var(--rv-leading-title-sm);
+}
+
+.rv-explore__panel-head > svg {
+  flex: none;
+  color: var(--rv-muted);
+}
+
+.rv-explore__kicker {
+  margin: 0;
+  color: var(--rv-dim);
+  font-family: var(--rv-font-mono);
+  font-size: var(--rv-type-caption);
+  font-weight: var(--rv-weight-medium);
+  letter-spacing: var(--rv-tracking-label);
+  line-height: var(--rv-leading-caption);
+  text-transform: uppercase;
+}
+
+.rv-explore__meta {
+  flex: none;
+  color: var(--rv-dim);
+  font-family: var(--rv-font-mono);
+  font-size: var(--rv-type-caption);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--rv-leading-caption);
+}
+
+/* Selection strip: joined cells. The 1px grid gap over a line-coloured
+ * background draws the dividers, so they stay right in every column count. */
+.rv-explore__summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr) minmax(0, 1.7fr) minmax(140px, .7fr);
+  gap: 1px;
+  margin: 0;
+  border-bottom: 1px solid var(--rv-line);
+  background: var(--rv-line);
+}
+
+.rv-explore__summary > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 14px var(--rv-space-4);
+  background: var(--rv-surface);
+}
+
+.rv-explore__summary dt {
+  color: var(--rv-dim);
+  font-size: var(--rv-type-caption);
+  line-height: var(--rv-leading-caption);
+}
+
+.rv-explore__summary dd {
+  margin: 0;
+  overflow: hidden;
+  color: var(--rv-text);
+  font-family: var(--rv-font-mono);
+  font-size: var(--rv-type-title-sm);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--rv-weight-medium);
+  line-height: var(--rv-leading-title-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rv-explore__summary small {
+  overflow: hidden;
+  color: var(--rv-dim);
+  font-size: var(--rv-type-caption);
+  line-height: var(--rv-leading-caption);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rv-explore__chart-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rv-space-2);
+  min-width: 0;
+  padding: var(--rv-space-3) var(--rv-space-4) var(--rv-space-4);
+}
+
+/* Calm data states: one line of fact and one line on what to change. */
+.rv-explore__state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--rv-space-1);
+  min-height: 128px;
+  padding: var(--rv-space-6) var(--rv-space-4);
+  text-align: center;
+}
+
+.rv-explore__state p {
+  max-width: 60ch;
+  margin: 0;
+}
+
+.rv-explore__state-title {
+  color: var(--rv-text);
+  font-size: var(--rv-type-body);
+  font-weight: var(--rv-weight-semibold);
+  line-height: var(--rv-leading-body);
+}
+
+.rv-explore__state-hint {
+  color: var(--rv-muted);
+  font-size: var(--rv-type-body);
+  line-height: var(--rv-leading-body);
+}
+
+.rv-explore__state.is-error .rv-explore__state-title {
+  color: var(--rv-red);
+}
+
+.rv-explore__note {
+  margin: 0;
+  padding: var(--rv-space-2) var(--rv-space-3);
+  border: 1px solid var(--rv-amber-line);
+  border-radius: var(--radius-md);
+  background: var(--rv-amber-soft);
+  color: var(--rv-amber);
+  font-size: var(--rv-type-body);
+  line-height: var(--rv-leading-body);
+}
+
+.rv-explore__selection {
+  padding: var(--rv-space-2) var(--rv-space-3);
+  border: 1px solid var(--rv-accent-line);
+  border-radius: var(--radius-md);
+  background: var(--rv-accent-soft);
+  color: var(--rv-accent-text);
+  font-family: var(--rv-font-mono);
+  font-size: var(--rv-type-caption);
+  line-height: var(--rv-leading-caption);
+  overflow-wrap: anywhere;
+}
+
+/* ---------- SQL workspace ---------- */
+
+.rv-explore__sql {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--rv-space-5);
+  align-items: start;
+  min-width: 0;
+}
+
+@container rv-explore (min-width: 900px) {
+  .rv-explore__sql {
+    grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
+  }
+}
+
+.rv-explore__sql-main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rv-space-5);
+  min-width: 0;
+}
+
+.rv-explore__console {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rv-space-3);
+  padding: var(--rv-space-4);
+}
+
+.rv-explore__console textarea {
+  width: 100%;
+  min-height: 160px;
+  padding: var(--rv-space-3);
+  resize: vertical;
+  border: 1px solid var(--rv-control-border);
+  border-radius: var(--radius-md);
+  background: var(--rv-code-bg);
+  color: var(--rv-code-text);
+  font-family: var(--rv-font-mono);
+  font-size: var(--rv-type-ui);
+  line-height: var(--rv-leading-ui);
+  tab-size: 2;
+}
+
+.rv-explore__console textarea:disabled {
+  color: var(--rv-muted);
+  cursor: progress;
+}
+
+.rv-explore__shortcut {
+  margin-left: auto;
+  color: var(--rv-dim);
+  font-size: var(--rv-type-caption);
+  line-height: var(--rv-leading-caption);
+}
+
+.rv-explore__shortcut kbd {
+  padding: 1px 5px;
+  border: 1px solid var(--rv-line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--rv-surface-raised);
+  color: var(--rv-muted);
+  font-family: var(--rv-font-mono);
+  font-size: var(--rv-type-caption);
+  line-height: var(--rv-leading-caption);
+}
+
+.rv-explore__sql-error {
+  padding: var(--rv-space-2) var(--rv-space-3);
+  border: 1px solid var(--rv-red-line);
+  border-radius: var(--radius-md);
+  background: var(--rv-red-soft);
+  color: var(--rv-red);
+  font-size: var(--rv-type-body);
+  line-height: var(--rv-leading-body);
+}
+
+.rv-explore__results {
+  max-width: 100%;
+  max-height: 560px;
+  overflow: auto;
+}
+
+.rv-explore__results table {
+  width: 100%;
+  border-collapse: collapse;
+  color: var(--rv-text);
+  font-family: var(--rv-font-mono);
+  font-size: var(--rv-type-ui);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--rv-leading-ui);
+}
+
+.rv-explore__results th {
+  position: sticky;
+  top: 0;
+  padding: var(--rv-space-2) var(--rv-space-4);
+  border-bottom: 1px solid var(--rv-line);
+  background: var(--rv-table-head);
+  color: var(--rv-dim);
+  font-size: var(--rv-type-caption);
+  font-weight: var(--rv-weight-medium);
+  letter-spacing: var(--rv-tracking-label);
+  line-height: var(--rv-leading-caption);
+  text-align: left;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.rv-explore__results th.is-num {
+  text-align: right;
+}
+
+.rv-explore__results td {
+  height: 40px;
+  padding: var(--rv-space-2) var(--rv-space-4);
+  border-bottom: 1px solid var(--rv-line);
+  vertical-align: middle;
+  overflow-wrap: anywhere;
+}
+
+.rv-explore__results tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.rv-explore__results tbody tr:hover td {
+  background: var(--rv-surface-hover);
+}
+
+/* Local history: a divided list, not a stack of cards. */
+.rv-explore__history-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rv-explore__history-list li {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rv-space-2);
+  min-width: 0;
+  padding: var(--rv-space-3) var(--rv-space-4);
+  border-bottom: 1px solid var(--rv-line);
+}
+
+.rv-explore__history-list li:last-child {
+  border-bottom: 0;
+}
+
+.rv-explore__history-list code {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--rv-text);
+  font-family: var(--rv-font-mono);
+  font-size: var(--rv-type-caption);
+  line-height: var(--rv-leading-caption);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.rv-explore__history-list li > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.rv-explore__history-list button {
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--rv-control-border);
+  border-radius: var(--radius-sm);
+  background: var(--rv-control-bg);
+  color: var(--rv-text);
+  font-size: var(--rv-type-ui);
+  line-height: var(--rv-leading-ui);
+  cursor: pointer;
+  transition: background-color 140ms ease;
+}
+
+.rv-explore__history-list button:hover {
+  background: var(--rv-control-hover);
+}
+
+.rv-explore__history-list button:disabled {
+  border-color: var(--rv-line-strong);
+  background: transparent;
+  color: var(--rv-dim);
+  cursor: not-allowed;
+}
+
+/* ---------- Narrower content columns ---------- */
+
+/* Content-width break: the four selection cells need about 820px. */
+@container rv-explore (max-width: 820px) {
+  .rv-explore__summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .rv-explore__auto {
+    margin-left: 0;
+  }
+}
+
+@media (max-width: 700px) {
+  .rv-explore .rv-page-header__actions {
+    justify-content: space-between;
+  }
+
+  .rv-explore .rv-explore__mode {
+    height: 46px;
+  }
+
+  .rv-explore .rv-explore__mode > button {
+    height: 38px;
+    flex: 1 1 0;
+  }
+
+  .rv-explore__filters,
+  .rv-explore__console {
+    padding: var(--rv-space-3);
+  }
+
+  .rv-explore__field,
+  .rv-explore__field.is-topic,
+  .rv-explore__field.is-date {
+    flex-basis: 100%;
+  }
+
+  .rv-explore__field.is-robot,
+  .rv-explore__field.is-bucket {
+    flex: 1 1 140px;
+  }
+
+  .rv-explore__field select,
+  .rv-explore__field input {
+    height: 44px;
+  }
+
+  /* Touch targets: every control is at least 44px high. */
+  .rv-explore .rv-explore__btn,
+  .rv-explore__auto,
+  .rv-explore__saved-item button,
+  .rv-explore__history-list button,
+  .rv-explore__save-form input {
+    min-height: 44px;
+  }
+
+  .rv-explore__save-form {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .rv-explore__save-form label,
+  .rv-explore__save-form input {
+    grid-column: 1 / -1;
+  }
+
+  .rv-explore__saved-item {
+    width: 100%;
+  }
+
+  .rv-explore__saved-item .rv-explore__saved-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-align: left;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .rv-explore__panel-head {
+    padding: var(--rv-space-3);
+  }
+
+  .rv-explore__summary > div {
+    padding: var(--rv-space-3);
+  }
+
+  .rv-explore__chart-body {
+    padding: var(--rv-space-2) var(--rv-space-2) var(--rv-space-3);
+  }
+
+  .rv-explore__shortcut {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .rv-explore__history-list li > div {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .rv-explore__results th,
+  .rv-explore__results td {
+    padding-inline: var(--rv-space-3);
+  }
+}
+
+/* Narrow: Robot and Bucket share a row; Topic and Range take the full width. */
+@media (max-width: 460px) {
+  .rv-explore__summary {
+    grid-auto-flow: row dense;
+  }
+
+  .rv-explore__summary > div:nth-child(2),
+  .rv-explore__summary > div:nth-child(3) {
+    grid-column: 1 / -1;
+  }
+
+  .rv-explore .rv-page-header__actions > .rv-explore__mode {
+    width: 100%;
+  }
+
+  .rv-explore__toolbar-group {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  .rv-explore__auto {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rv-explore *,
+  .rv-explore *::before,
+  .rv-explore *::after {
+    transition: none !important;
+  }
+}

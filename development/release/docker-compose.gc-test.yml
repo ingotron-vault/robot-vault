@@ -1,0 +1,24 @@
+services:
+  # Never point the GC integration test at the development object-store volume.
+  # The unique Compose project isolates container names, and this anonymous
+  # volume (removed by `down -v`) isolates object bytes.
+  objectstore:
+    container_name: !reset null
+    volumes: !override
+      - type: volume
+        target: /data
+
+  dev-storage-credential-guard:
+    container_name: !reset null
+
+  test-postgres:
+    container_name: !reset null
+
+  db-migrate:
+    container_name: !reset null
+
+  objectstore-access-ready:
+    container_name: !reset null
+
+  dev:
+    container_name: !reset null

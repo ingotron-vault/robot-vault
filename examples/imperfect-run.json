@@ -1,0 +1,95 @@
+{
+  "bytes": 214866,
+  "demonstrates": [
+    "real QA DEFECT signals from missing calibration, timestamp jitter, and stream gaps",
+    "real QA RISK signals from an unlabeled episode and frozen/blurred frames",
+    "checks flag data without deleting it"
+  ],
+  "example_data_version": 1,
+  "file": "imperfect-run.mcap",
+  "generation": {
+    "image_messages_written": 22,
+    "injections": {
+      "camera_frames_dropped": 14,
+      "camera_header_jitter_ms": 850,
+      "dynamic_tf_messages_dropped": 40,
+      "expected_qa_classes": [
+        "defect",
+        "risk"
+      ],
+      "frozen_blurred_camera_window_seconds": [
+        5.0,
+        7.0
+      ],
+      "laser_messages_dropped": 14,
+      "missing_camera_info": true,
+      "missing_static_tf": true,
+      "unlabeled_marker": true
+    },
+    "message_count": 207,
+    "real_angular_z_max": 0.0,
+    "real_angular_z_min": -0.35577830001748534,
+    "source_topics": {
+      "camera": "/camera/rgb/image_color",
+      "camera_info": "/camera/rgb/camera_info",
+      "laser": "/scan",
+      "odometry": "/pose",
+      "twist": "derived measured velocity from /pose pose trajectory"
+    },
+    "source_window_duration_seconds": 8.0,
+    "source_window_start_ns": 1311877812990789962,
+    "topic_counts": {
+      "/camera/rgb/image_compressed": 22,
+      "/measured_twist": 40,
+      "/odom": 80,
+      "/scan": 24,
+      "/session/task": 1,
+      "/tf": 40
+    }
+  },
+  "label": "imperfect-run",
+  "look_at": [
+    "Episodes QA breakdown: both DEFECT and RISK classes",
+    "cross_stream_sync interpolation provenance",
+    "calibration, completeness, image_quality, and labels reasons"
+  ],
+  "message_count": 207,
+  "notes": [
+    "This bag must be accepted only if the real processor reports at least one low DEFECT and one low RISK check.",
+    "Malformed/truncated CDR was intentionally avoided so every retained message remains decodable."
+  ],
+  "robot_id": "example-wheeled-01",
+  "robot_type": "Pioneer mobile robot (engineered QA-fault derivative)",
+  "schema": "robot-vault-example/v1",
+  "schemas": {
+    "/camera/rgb/image_compressed": "sensor_msgs/msg/CompressedImage",
+    "/measured_twist": "geometry_msgs/msg/Twist",
+    "/odom": "nav_msgs/msg/Odometry",
+    "/scan": "sensor_msgs/msg/LaserScan",
+    "/session/task": "std_msgs/msg/String",
+    "/tf": "tf2_msgs/msg/TFMessage"
+  },
+  "sha256": "a21dead075e4598844e584aac13d641bce13321c10343aaa87559481d4442511",
+  "source": {
+    "attribution": "Technical University of Munich, Computer Vision Group, TUM RGB-D Benchmark, sequence fr2/pioneer_slam2, CC BY 4.0.",
+    "dataset": "TUM RGB-D Benchmark derivative",
+    "license": "Creative Commons Attribution 4.0 International (CC BY 4.0)",
+    "sequence": "fr2/pioneer_slam2",
+    "source_sha256": "7e8f31ec7d1893f6bd7eaaae5092bc186957c9ff0eb0a85cdca404220ebcd37d",
+    "source_url": "https://cvg.cit.tum.de/data/datasets/rgbd-dataset/download"
+  },
+  "topic_counts": {
+    "/camera/rgb/image_compressed": 22,
+    "/measured_twist": 40,
+    "/odom": 80,
+    "/scan": 24,
+    "/session/task": 1,
+    "/tf": 40
+  },
+  "transformations": [
+    "started from the exact wheeled-nominal source window",
+    "removed CameraInfo and static TF, dropped camera/laser/TF stretches, jittered camera header stamps by +/-850 ms",
+    "froze and blurred a camera interval and emitted a deliberately empty task marker",
+    "did not insert, update, or otherwise fabricate any qa_reports row"
+  ]
+}

@@ -1,0 +1,36 @@
+# Benchmark overlay — grants NET_ADMIN to the `robot` service ONLY.
+#
+# Every upload number in phases/02-robot-upload-agent/docs/technical.md was
+# measured on single-host loopback: multi-Gbit, ~0.05 ms RTT, no TLS. So the
+# repo publishes no claim about behaviour on a poor connection, while
+# smart_batching.py's whole premise is connection-quality adaptation. Testing
+# that means shaping the link with `tc netem` inside the robot container,
+# which needs CAP_NET_ADMIN.
+#
+# NET_ADMIN lets a container reconfigure networking — it is a real capability
+# grant, not a convenience flag, so it lives here rather than in
+# docker-compose.yml, exactly like deploy/docker-compose.debug.yml holds the
+# data-plane port exposure. `docker compose up` can never pick this file up
+# implicitly; it has to be named.
+#
+#   make bench-net PROFILE=poor-wifi
+#   # or, explicitly:
+#   docker compose -f docker-compose.yml -f deploy/docker-compose.bench.yml up -d robot
+#
+# Verify the base stack is unaffected:
+#   docker compose config | grep -c NET_ADMIN     # -> 0
+#   docker compose -f docker-compose.yml -f deploy/docker-compose.bench.yml config \
+#     | grep -A2 -B8 NET_ADMIN                    # -> only under `robot`
+#
+# `iproute2` (for tc) and `iputils-ping` (for the verification ping) must be
+# present in the image. The root Dockerfile installs both. If you see "tc is not available", rebuild: `docker compose
+# build robot`.
+services:
+  ingest:
+    environment:
+      # Benchmark-only override. The base/release default remains 2; the benchmark
+      # matrix includes a four-stream arm and must not silently measure 1,2,2.
+      PER_ROBOT_CONCURRENCY: ${BENCH_PER_ROBOT_CONCURRENCY:-4}
+  robot:
+    cap_add:
+      - NET_ADMIN

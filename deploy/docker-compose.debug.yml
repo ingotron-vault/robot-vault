@@ -1,0 +1,43 @@
+# Debug overlay — republish the data plane on the host.
+#
+# docker-compose.yml publishes the user-facing query/API, SPA, and robot UI;
+# loopback-only GC metrics and opt-in Prometheus are operational endpoints.
+# Ingest gRPC/admin, Postgres, and the object store remain compose-network-only because all
+# three use development credentials that must not be open to every LAN peer.
+#
+# This file is the explicit opt-in for the times you genuinely need them from
+# the host — grpcurl against ingest, psql, rclone or the AWS CLI, or direct
+# presigned downloads after explicitly configuring `S3_PUBLIC_ENDPOINT` to the
+# published API port. Default browser downloads use query's same-origin proxy
+# and do not need this overlay.
+#
+#   docker compose -f docker-compose.yml -f deploy/docker-compose.debug.yml up -d
+#   docker compose -f docker-compose.yml -f deploy/docker-compose.debug.yml ps
+#   # or, equivalently:
+#   make debug-up      # publish
+#   make debug-down    # unpublish (recreates the same containers without the ports)
+#
+# Compose *appends* these `ports` entries to the base file's, so nothing here
+# removes a published port — it only adds.
+#
+# Every mapping binds 127.0.0.1 by default: even opted in, the data plane is
+# reachable from this machine only. The development credential guard refuses a
+# non-loopback DEBUG_BIND_HOST because Postgres uses a fixed password. For an
+# off-box robot, set a random INGEST_AUTH_TOKEN and use `make expose-ingest`;
+# that target recreates ingest only (see README "Network boundaries").
+#
+# A compose `profiles:` key cannot gate a single port (profiles start/stop
+# whole services, and the data plane must always be *running*), so the opt-in
+# is this overlay rather than a profile.
+services:
+  ingest:
+    ports:
+      - "${DEBUG_BIND_HOST:-127.0.0.1}:${INGEST_GRPC_PORT:-50051}:50051"
+      - "${DEBUG_BIND_HOST:-127.0.0.1}:${INGEST_ADMIN_PORT:-8080}:8080"
+  postgres:
+    ports:
+      - "${DEBUG_BIND_HOST:-127.0.0.1}:${POSTGRES_PORT:-5432}:5432"
+  objectstore:
+    ports:
+      # S3 API only; RustFS runs without its console (development/objectstore/CONTRACT.md).
+      - "${DEBUG_BIND_HOST:-127.0.0.1}:${OBJECTSTORE_API_PORT:-9002}:9000"

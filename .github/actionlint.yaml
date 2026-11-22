@@ -1,0 +1,5 @@
+# The only repository-specific runner label. The standard self-hosted, Linux,
+# and x64 labels remain actionlint built-ins.
+self-hosted-runner:
+  labels:
+    - robot-vault-ci

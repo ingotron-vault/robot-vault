@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+package robotics.upload.v1;
+
+// Robot enrollment is deliberately a separate service from UploadService.
+// Enroll is authenticated by its one-use enrollment code, rather than the
+// shared ingest bearer that protects the legacy UploadService surface.
+service RobotEnrollment {
+  rpc Enroll(EnrollRequest) returns (CredentialResponse);
+}
+
+// Enrollment inputs supplied by the robot bootstrapper.  agent_version,
+// hostname, and platform are display/audit data only; the enrollment code is
+// the sole enrollment credential.
+message EnrollRequest {
+  string code = 1;          // ign1.<ca-pin>.<secret>
+  string agent_version = 2;
+  string hostname = 3;      // display only, untrusted
+  string platform = 4;      // e.g. "linux/amd64"
+}
+
+// Server-recommended agent settings returned as part of a successful
+// enrollment.  These are explicit numeric types so generated Rust and Python
+// clients do not need a JSON-specific interpretation of the response.
+message UploadSettings {
+  int64 chunk_size_bytes = 1;
+  int32 parallel_streams = 2;
+  double min_stable_age_seconds = 3;
+}
+
+// The plaintext credential is present only in this response.  Servers must
+// never persist it; clients must store it in the robot's protected token file.
+message CredentialResponse {
+  string robot_id = 1;
+  string credential = 2;              // ignr1.<secret>
+  string credential_fingerprint = 3;
+  string ingest_endpoint = 4;
+  UploadSettings recommended = 5;
+  int64 supersedes_grace_seconds = 6; // 0 for Enroll
+  bool self_rotation_enabled = 7;
+}

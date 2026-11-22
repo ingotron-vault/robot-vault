@@ -1,0 +1,49 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "BucketMetadata",
+      "Effect": "Allow",
+      "Action": ["s3:GetBucketLocation", "s3:ListBucket"],
+      "Resource": "arn:aws:s3:::__ROBOT_VAULT_BUCKET__"
+    },
+    {
+      "Sid": "ReadCasForDeduplication",
+      "Effect": "Allow",
+      "Action": "s3:GetObject",
+      "Resource": "arn:aws:s3:::__ROBOT_VAULT_BUCKET__/cas/files/*"
+    },
+    {
+      "Sid": "VerifyAndDiscardIncompleteRawObjects",
+      "Effect": "Allow",
+      "Action": ["s3:GetObject", "s3:DeleteObject"],
+      "Resource": "arn:aws:s3:::__ROBOT_VAULT_BUCKET__/raw/*"
+    },
+    {
+      "Sid": "WriteIngestObjects",
+      "Effect": "Allow",
+      "Action": "s3:PutObject",
+      "Resource": [
+        "arn:aws:s3:::__ROBOT_VAULT_BUCKET__/raw/*",
+        "arn:aws:s3:::__ROBOT_VAULT_BUCKET__/cas/files/*",
+        "arn:aws:s3:::__ROBOT_VAULT_BUCKET__/manifests/*",
+        "arn:aws:s3:::__ROBOT_VAULT_BUCKET__/_health/ingest/*"
+      ]
+    },
+    {
+      "Sid": "CleanReadinessProbe",
+      "Effect": "Allow",
+      "Action": "s3:DeleteObject",
+      "Resource": "arn:aws:s3:::__ROBOT_VAULT_BUCKET__/_health/ingest/*"
+    },
+    {
+      "Sid": "StreamRawUploads",
+      "Effect": "Allow",
+      "Action": [
+        "s3:AbortMultipartUpload",
+        "s3:ListMultipartUploadParts"
+      ],
+      "Resource": "arn:aws:s3:::__ROBOT_VAULT_BUCKET__/raw/*"
+    }
+  ]
+}

@@ -1,0 +1,48 @@
+[package]
+name = "ingest-server"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tonic = { version = "0.11", features = ["tls", "gzip", "zstd"] }
+prost = "0.12"
+prost-types = "0.12"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "fs", "io-util", "time"] }
+tokio-stream = "0.1"
+axum = "0.7"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+sha2 = "0.10"
+hex = "0.4"
+anyhow = "1"
+bytes = "1"
+parking_lot = "0.12"
+dashmap = "5"
+# `metrics` MUST stay on the exact compatible version used by
+# metrics-exporter-prometheus 0.14 (metrics 0.22). Two incompatible 0.x versions compile
+# fine but give the process two independent global-recorder statics:
+# `install_recorder()` fills the exporter's, while every `counter!`/`histogram!`
+# in this crate writes to the other one -- still the no-op sink, so /metrics
+# answers 200 with an empty body. Bump both together or neither.
+metrics = "0.22"
+metrics-exporter-prometheus = "0.14"
+chrono = { version = "0.4", features = ["clock"] }
+tonic-health = "0.11"
+tonic-reflection = "0.11"
+aws-config = { version = "1" }
+aws-sdk-s3 = { version = "1" }
+aws-types = { version = "1" }
+base64ct = "=1.7.3"
+uuid = { version = "1", features = ["v4", "serde"] }
+tokio-postgres = { version = "0.7", features = ["with-uuid-1", "with-chrono-0_4", "with-serde_json-1"] }
+deadpool-postgres = "0.13"
+x509-parser = "0.16"
+percent-encoding = "2"
+
+[build-dependencies]
+tonic-build = "0.11"
+prost-build = "0.12"
+
+ 

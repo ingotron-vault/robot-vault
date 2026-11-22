@@ -1,0 +1,40 @@
+.tmp/
+/tmp/
+# Postgres and object-store bind mounts (./data). These are
+# root-owned once the stack has run, so leaving them in the build context makes
+# every rebuild fail with "permission denied".
+/data/
+uploads/
+# Host/deployment secrets are runtime mounts, never image build inputs.
+# Gitignore alone does not protect a Docker build context.
+.env
+.env.*
+**/.env
+**/.env.*
+**/*CREDENTIALS.local*
+certs/
+secrets/
+/build/
+# Local tool folders; never part of an image build context.
+.claude/
+.agents/
+.codex/
+.cache/
+**/.claude/
+**/.agents/
+**/.codex/
+**/.cache/
+**/__pycache__/
+**/*.pyc
+.git/
+.target/
+node_modules/
+**/node_modules/
+**/coverage/
+**/dist/
+*.log
+**/.mypy_cache/
+**/.pytest_cache/
+**/.ruff_cache/
+**/.venv/
+**/venv/

@@ -1,0 +1,58 @@
+.rv-command {
+  display: grid;
+  gap: 6px;
+  border: 1px solid var(--rv-line);
+  border-radius: 8px;
+  background: var(--rv-surface-inset);
+  padding: 10px 12px 8px;
+}
+
+.rv-command__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.rv-command__label {
+  color: var(--rv-dim);
+  font-family: var(--rv-font-mono);
+  font-size: var(--rv-type-caption);
+  font-weight: var(--rv-weight-medium);
+  letter-spacing: var(--rv-tracking-label);
+  line-height: var(--rv-leading-caption);
+  text-transform: uppercase;
+}
+
+/*
+ * `overflow-x: auto` and NOT `text-overflow: ellipsis`: the guidelines allow a
+ * command to scroll horizontally inside its own container but forbid hiding
+ * part of a machine value. `white-space: pre` keeps the line break
+ * exactly where the vault put it.
+ */
+.rv-command__body {
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--rv-line);
+  border-radius: 6px;
+  background: var(--rv-surface-raised);
+  color: var(--rv-text);
+  font-family: var(--rv-font-mono);
+  font-size: var(--rv-type-caption);
+  line-height: var(--rv-leading-body);
+  overflow-x: auto;
+  white-space: pre;
+}
+
+.rv-command__body:focus-visible {
+  outline: 2px solid var(--rv-accent);
+  outline-offset: 1px;
+}
+
+.rv-command__status {
+  margin: 0;
+  min-height: 1.2em;
+  color: var(--rv-muted);
+  font-size: var(--rv-type-caption);
+  line-height: var(--rv-leading-caption);
+}

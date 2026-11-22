@@ -1,0 +1,22 @@
+#!/bin/sh
+# /opt/ingotron-agent/current/bin/ingotron-agent-run -- the unit's ExecStart.
+#
+# ExecStart is a wrapper, not a shell line, because rsm/rua ignore
+# VAULT_CONFIG_PATH and must be given --config explicitly.  The wrapper takes
+# the single-instance flock, runs scan -> hash -> upload, writes
+# state/last_run.json and emits one JSON line per stage to the journal.
+set -eu
+
+_self=$(readlink -f "$0" 2>/dev/null || printf '%s' "$0")
+_bin=$(dirname "$_self")
+
+# `ingotron-agent` is the PyInstaller bootloader and carries its interpreter,
+# grpcio, protobuf, prometheus-client, and all first-party runtime modules.
+# There is deliberately no PATH lookup for python and no PYTHONPATH fallback:
+# systemd must execute the exact immutable release that robot.sh selected.
+[ -x "$_bin/ingotron-agent" ] || {
+    printf '{"stage":"run","ok":false,"error":"frozen ingotron-agent executable is missing"}\n' >&2
+    exit 1
+}
+
+exec "$_bin/ingotron-agent" run --once "$@"

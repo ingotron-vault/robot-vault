@@ -1,0 +1,30 @@
+{
+  "_comment": "TEMPLATE ONLY. robot.sh does not copy this file; ingotron_agent.enroll builds the real /etc/ingotron/vault.json from the enrollment response so that server.host/port come from the vault's INGEST_PUBLIC_HOST and cannot drift from the certificate the robot will verify. This file documents the shape and is what an operator compares against. NOTE: the config loader rejects unknown keys, so this _comment key must be removed before the file is loadable -- that is deliberate, it stops the template from being mistaken for a config.",
+  "robot_id": "rover-7",
+  "paths": {
+    "robot_root": "/data/robot_data"
+  },
+  "server": {
+    "host": "rover-vault.local",
+    "port": 50051
+  },
+  "tls": {
+    "enabled": true,
+    "mtls": false,
+    "ca_path": "/etc/ingotron/ca.crt"
+  },
+  "auth": {
+    "token_file": "/etc/ingotron/credentials/robot.token"
+  },
+  "upload_agent": {
+    "chunk_size_bytes": 8388608,
+    "parallel_streams": 2,
+    "concurrency": 2,
+    "min_stable_age_seconds": 30.0
+  },
+  "retention": {
+    "min_retain_days": 7,
+    "max_total_gib": 200.0,
+    "auto_apply": false
+  }
+}

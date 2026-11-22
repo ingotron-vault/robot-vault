@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "robot-upload-agent"
+version = "0.1.0"
+description = "Robot-side upload agent with operator triggers, integrity checks, and adaptive retry"
+authors = [{ name = "Robot Vault" }]
+readme = "README.md"
+requires-python = ">=3.10"
+keywords = ["robotics", "upload", "grpc", "resumable"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Operating System :: POSIX :: Linux",
+]
+
+[project.scripts]
+rua = "robot_upload_agent.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]

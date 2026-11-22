@@ -1,0 +1,54 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "BucketMetadata",
+      "Effect": "Allow",
+      "Action": "s3:GetBucketLocation",
+      "Resource": "arn:aws:s3:::__ROBOT_VAULT_BUCKET__"
+    },
+    {
+      "Sid": "ListExportSourcesAndDestination",
+      "Effect": "Allow",
+      "Action": "s3:ListBucket",
+      "Resource": "arn:aws:s3:::__ROBOT_VAULT_BUCKET__",
+      "Condition": {
+        "StringLike": {
+          "s3:prefix": [
+            "raw/*",
+            "cas/files/*",
+            "processed/parquet/*",
+            "processed/media/*",
+            "exports/*"
+          ]
+        }
+      }
+    },
+    {
+      "Sid": "ReadExportSources",
+      "Effect": "Allow",
+      "Action": "s3:GetObject",
+      "Resource": [
+        "arn:aws:s3:::__ROBOT_VAULT_BUCKET__/raw/*",
+        "arn:aws:s3:::__ROBOT_VAULT_BUCKET__/cas/files/*",
+        "arn:aws:s3:::__ROBOT_VAULT_BUCKET__/processed/parquet/*",
+        "arn:aws:s3:::__ROBOT_VAULT_BUCKET__/processed/media/*"
+      ]
+    },
+    {
+      "Sid": "WriteExportBundles",
+      "Effect": "Allow",
+      "Action": "s3:PutObject",
+      "Resource": "arn:aws:s3:::__ROBOT_VAULT_BUCKET__/exports/*"
+    },
+    {
+      "Sid": "AbortExportMultipartWrites",
+      "Effect": "Allow",
+      "Action": [
+        "s3:AbortMultipartUpload",
+        "s3:ListMultipartUploadParts"
+      ],
+      "Resource": "arn:aws:s3:::__ROBOT_VAULT_BUCKET__/exports/*"
+    }
+  ]
+}

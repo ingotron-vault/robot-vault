@@ -1,0 +1,138 @@
+# =============================================================================
+# PUBLIC CORE CI (GitHub-hosted runners, no credentials).
+# =============================================================================
+# It runs the core checks for ingotron-vault/robot-vault.
+# Every job has the repository guard below, so forks and copies skip every job.
+#
+# Security rules (development/test_public_workflow.py asserts each one):
+#   - triggers: pull_request, and push to main only. Never pull_request_target
+#     or workflow_run, so code from a fork PR never runs with write access.
+#   - permissions: {} at the top; each job gets contents: read only.
+#   - runs-on: ubuntu-24.04 only, never a self-hosted runner.
+#   - every action is pinned to a full commit SHA; checkout does not keep the
+#     token in .git/config (persist-credentials: false).
+#   - no secrets, no caches, no package writes, no release job. Images are
+#     promoted by hand from tested digests.
+#
+# Each check is defined once, in the Makefile. Jobs here only call the core
+# `make check` targets, split so they run in parallel.
+# =============================================================================
+
+name: Core CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  docs:
+    name: Docs and workflows
+    if: github.repository == 'ingotron-vault/robot-vault'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Documentation and workflow checks
+        run: make docs-check test-workflows
+
+  backend:
+    name: Backend quality and unit tests
+    if: github.repository == 'ingotron-vault/robot-vault'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Backend static quality and Python unit tests
+        run: make backend-quality test-unit
+
+  robot-agent:
+    name: Robot agent and upload jobs
+    if: github.repository == 'ingotron-vault/robot-vault'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Upload jobs E2E, robot agent runtime and dev exposure
+        run: make test-upload-jobs test-robot-agent-runtime test-dev-exposure
+
+  rust:
+    name: Rust ingest
+    if: github.repository == 'ingotron-vault/robot-vault'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Rust ingest tests
+        run: make test-rust
+
+  ui:
+    name: UI tests and build
+    if: github.repository == 'ingotron-vault/robot-vault'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: UI typecheck, unit tests and build
+        run: make ui-test ui-build
+
+  browser:
+    name: Browser E2E
+    if: github.repository == 'ingotron-vault/robot-vault'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Browser E2E
+        run: make test-browser
+
+  release-config:
+    name: Release configuration contracts
+    if: github.repository == 'ingotron-vault/robot-vault'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Release, observability and GC configuration contracts
+        run: make test-release-config test-observability-config test-gc-integration-config

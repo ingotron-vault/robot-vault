@@ -1,0 +1,17 @@
+#!/bin/sh
+# /opt/ingotron-agent/current/bin/ingotron-agent-retention
+#
+# Runs `rsm retention plan` daily and LOGS THE PLAN WITHOUT DELETING
+# unless retention.auto_apply is explicitly true in vault.json.  Auto-deleting a
+# customer's recordings on day one is not a default.
+set -eu
+
+_self=$(readlink -f "$0" 2>/dev/null || printf '%s' "$0")
+_bin=$(dirname "$_self")
+
+[ -x "$_bin/ingotron-agent" ] || {
+    printf '{"stage":"retention","ok":false,"error":"frozen ingotron-agent executable is missing"}\n' >&2
+    exit 1
+}
+
+exec "$_bin/ingotron-agent" __retention "$@"

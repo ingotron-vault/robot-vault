@@ -1,0 +1,31 @@
+#!/bin/sh
+# /opt/ingotron-agent/current/bin/ingotron-agent
+#
+# The operator entry point.  POSIX sh, because it is also reached through
+# /usr/local/bin/ingotron-agent -> current -> releases/<v>/bin/ingotron-agent
+# and must behave identically no matter which shell invokes it.
+#
+# SOURCE-CHECKOUT TEST LAUNCHER ONLY.  The release builder replaces this file
+# with the PyInstaller executable and never copies these bytes into the
+# tarball.  Keeping a source launcher makes direct unit work convenient without
+# weakening the shipped artifact's no-host-Python contract.
+set -eu
+
+_self=$(readlink -f "$0" 2>/dev/null || printf '%s' "$0")
+_bin=$(dirname "$_self")
+_root=$(dirname "$_bin")
+
+_python=$(command -v python3 || true)
+[ -n "$_python" ] || {
+    printf 'ingotron-agent: no python3 interpreter found in this bundle or on PATH\n' >&2
+    exit 1
+}
+
+if [ -n "${PYTHONPATH:-}" ]; then
+    PYTHONPATH="$_root/lib:$PYTHONPATH"
+else
+    PYTHONPATH="$_root/lib"
+fi
+export PYTHONPATH
+
+exec "$_python" -m ingotron_agent.cli "$@"

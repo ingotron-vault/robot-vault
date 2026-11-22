@@ -1,0 +1,43 @@
+# The shared b32_prefix conformance fixture.
+#
+# One vector set, three implementations: the POSIX-sh verifier in robot.sh
+# (the CA pin check), the Rust minter in
+# phases/03-ingest-server-rs/src/crockford.rs (the code's CA pin), and the Python
+# encoder in packaging/robot-agent/agent/lib/ingotron_agent/crockford.py that
+# `ingotron-agent status` uses to re-check the installed CA.
+#
+# This fixture is the main guard against a bug in the hand-written shell
+# encoder: three implementations, one test-vector set. A drift between
+# minter and verifier is a total enrollment outage.
+#
+# Columns, TAB-separated:  hex <TAB> want <TAB> expected_rc <TAB> expected_out
+#   hex           the input; the literal token <empty> means the empty string
+#                 (a leading empty field cannot survive a tab-separated read,
+#                 because tab is IFS whitespace and leading IFS whitespace is
+#                 stripped -- hence the sentinel)
+#   expected_rc   0 = success, 1 = refusal
+#   expected_out  "-" when expected_rc is 1; a refusal must emit NOTHING, since
+#                 a partial answer would compare unequal and look like a MITM
+#
+# Rows 1-6 give the same result under dash, busybox ash and an independent
+# Python encoder.
+#
+# SHA-256("x")
+2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881	26	0	5NRHCGNQ4TR480B2FJMZQB1JYQ
+0000000000000000000000000000000000	26	0	00000000000000000000000000
+ffffffffffffffffffffffffffffffffff	26	0	ZZZZZZZZZZZZZZZZZZZZZZZZZZ
+<empty>	26	1	-
+abcd	26	1	-
+zz	4	1	-
+# Row 7 checks that the pin encodes 130 bits of the digest, and it is the only
+# row that can catch a change to the wrong "encoding of SHA-256(SPKI)[0..16]" definition.
+# 18 bytes: sixteen 0x00, then 0xff, then 0x00. Character 26 spans bit
+# positions 125-129, so its low two bits come from byte 16 (0xff) and its value
+# is 0b00011 = 3. Under the wrong definition only 16 bytes = 128 bits are
+# available, which cannot produce 26 characters (130 bits) at all -- that
+# definition zero-pads to get there. Verified against an independent Python
+# encoder.
+00000000000000000000000000000000ff00	26	0	00000000000000000000000003
+# Sub-26 widths: the same function is used for prefixes shorter than a pin.
+2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881	1	0	5
+2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881	8	0	5NRHCGNQ

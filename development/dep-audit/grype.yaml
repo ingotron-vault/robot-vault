@@ -1,0 +1,36 @@
+# Release-gate policy for Grype 0.116.1. The scanner wrapper verifies this
+# file's SHA-256 before use; changes require an explicit policy review.
+log:
+  level: warn
+
+output:
+  - json
+pretty: false
+check-for-app-update: false
+only-fixed: false
+only-notfixed: false
+ignore-wontfix: ""
+ignore: []
+exclude: []
+external-sources:
+  enable: false
+fail-on-severity: high
+registry:
+  insecure-skip-tls-verify: false
+  insecure-use-http: false
+  auth: []
+vex-documents: []
+vex-add: []
+# Do not apply Grype's default indirect kernel-header suppression rules.
+match-upstream-kernel-headers: true
+
+db:
+  cache-dir: ~/.cache/grype/db
+  update-url: https://grype.anchore.io/databases
+  auto-update: true
+  validate-by-hash-on-start: true
+  validate-age: true
+  max-allowed-built-age: 24h0m0s
+  require-update-check: true
+  update-available-timeout: 30s
+  update-download-timeout: 5m

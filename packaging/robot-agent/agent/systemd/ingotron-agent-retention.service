@@ -1,0 +1,40 @@
+[Unit]
+Description=Robot Vault retention policy check
+Documentation=https://docs.ingotron.com/robot
+After=network-online.target
+Wants=network-online.target
+ConditionPathExists=/etc/ingotron/vault.json
+
+[Service]
+Type=oneshot
+User=ingotron
+Group=ingotron
+ExecStart=/opt/ingotron-agent/current/bin/ingotron-agent-retention
+TimeoutStartSec=3h
+WorkingDirectory=/var/lib/ingotron
+EnvironmentFile=-/etc/ingotron/agent.env
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ingotron-agent-retention
+UMask=0077
+
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadOnlyPaths=/etc/ingotron
+ReadWritePaths=/var/lib/ingotron
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources
+CapabilityBoundingSet=

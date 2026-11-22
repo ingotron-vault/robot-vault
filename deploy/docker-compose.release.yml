@@ -1,0 +1,976 @@
+# Robot Vault — release topology
+#
+# This is NOT docker-compose.yml with a few knobs changed. It is a separate,
+# self-contained deployment file with a different contract:
+#
+#   * Every image avoids `:latest`. First-party services use a reviewed local
+#     `robot-vault-*:${ROBOT_VAULT_VERSION}` tag with `pull_policy: never`;
+#     every third-party image, including optional profiles, is pinned by a
+#     sha256 manifest digest. Published core images are listed by digest in
+#     release/core-images.lock.json (see below).
+#   * NOTHING is built here. There is no `build:` key in this file. A release
+#     runs the images a release cut produced, tagged by `make release-tag`; if
+#     the tag is missing, compose fails loudly instead of rebuilding from a
+#     working tree that may not be the tree that was tested.
+#   * NO source-tree bind-mounts. The dev file mounts `.:/app` into services,
+#     which means a dev container runs the host's working tree, not the image.
+#     Here first-party application code comes from the image. The narrow
+#     exception is seven reviewed, read-only Compose `configs:` entries: the
+#     object-store bootstrap script, five policy JSON files and the alert rules.
+#     Other host paths are individual query/ingest certificate, key and CA
+#     files — never the development certs tree — plus named volumes for state.
+#   * NO debug ports. Only the HTTPS query front door (host port 443 by default)
+#     and the mTLS ingest gRPC data plane (host port 50051 by default) are
+#     published. Postgres, the object store, ingest admin/metrics and GC metrics are
+#     compose-network only. There is no
+#     release equivalent of deploy/docker-compose.debug.yml, by design.
+#   * NO `container_name:`. Names are project-scoped, so a release stack can be
+#     brought up (`-p robot-vault-release`) without colliding with a developer's
+#     running dev stack. `make release-up` sets the project name.
+#
+# ## Editions
+#
+# This file is the `core` edition: upload -> integrity -> Parquet -> query/UI,
+# plus the MCP server. It has no exporter, no dataset-cut or episode surface
+# and no Pro-only query settings. The Pro edition adds its services through its
+# own overlay file, given with a second `-f`. Three gates keep an edition
+# consistent, and they must agree:
+#
+#   (a) the query service, which mounts episodes/datasets routes only in Pro
+#       with the Pro package installed -- in core they 404 and are absent
+#       from /openapi.json;
+#   (b) the topology: this file defines no exporter, so a core deployment
+#       never runs one (`up --remove-orphans` also removes one left behind
+#       by an earlier Pro deployment of the same project);
+#   (c) the processor's own stage flags (`SEGMENTATION_ENABLED`, `QA_ENABLED`,
+#       `MEDIA_ENCODE_ENABLED`), set consistently below from the same variables.
+#       The processor rejects core+true, so a direct caller cannot reintroduce
+#       episode rows.
+#
+# The exporter's PostgreSQL role and object-store access key stay in the core
+# bootstrap as reserved identities (EXPORTER_DATABASE_URL and
+# EXPORTER_S3_SECRET_KEY are required here too). The schema is shared, so an
+# upgrade to Pro is only an image, env and service change.
+#
+# Compose cannot branch on a variable, so the flags come in from the
+# environment and `make release-up EDITION=core|pro` is what sets them
+# together. Release deployments deliberately set all four edition variables
+# explicitly as defence in depth; none has a Compose default, and the Make
+# preflight rejects disagreement. After `up`, `wait_release_ready.py` compares
+# the identity that every running service reports (query API, processor and
+# exporter startup lines, the served UI build) with the requested edition.
+#
+# ## Digest pinning
+#
+# The `@sha256:` digests below are immutable registry manifest digests. Local
+# platform images can be checked with `docker inspect`; multi-architecture
+# manifests (including Prometheus) are resolved with
+# `docker buildx imagetools inspect <repository>:<tag>`. The release validator
+# rejects any tag-only third-party service, including profile-gated extras.
+#
+# This file keeps local first-party `:${ROBOT_VAULT_VERSION}` tags
+# (`pull_policy: never`). To run published images instead of a local build,
+# `make core-images-pull` pulls the images in release/core-images.lock.json by
+# digest, checks them and tags them with these local names.
+#
+# ## Required configuration
+#
+# Security-sensitive deployment values have NO safe default and this file refuses to
+# render without them (`${VAR:?...}`). Direct Compose callers must additionally
+# set the four edition variables shown above. The supported Make workflow supplies
+# `ROBOT_VAULT_VERSION` from this checkout's VERSION file and supplies those
+# gates together from `EDITION=core|pro`:
+#
+#   ROBOT_VAULT_VERSION      the image tag to run (see the VERSION file)
+#   POSTGRES_PASSWORD        initializes the Postgres role on an empty volume
+#   DATABASE_URL             percent-encoded PostgreSQL owner URI used only by
+#                            migration and role-bootstrap one-shots
+#   INGEST_DATABASE_URL      URI for fixed role robot_vault_ingest
+#   PROCESSOR_DATABASE_URL   URI for fixed role robot_vault_processor
+#   EXPORTER_DATABASE_URL    URI for fixed role robot_vault_exporter
+#   QUERY_DATABASE_URL       URI for fixed role robot_vault_query
+#   GC_DATABASE_URL          URI for fixed role robot_vault_gc
+#   OBJECTSTORE_ROOT_USER    root access key of the object store
+#   OBJECTSTORE_ROOT_PASSWORD root password; the object store reads it only from a
+#                            Compose secret file; its access-bootstrap one-shot gets it too
+#   INGEST_S3_SECRET_KEY     secret for access key robot-vault-ingest
+#   PROCESSOR_S3_SECRET_KEY  secret for access key robot-vault-processor
+#   EXPORTER_S3_SECRET_KEY   secret for access key robot-vault-exporter
+#   QUERY_S3_SECRET_KEY      secret for access key robot-vault-query
+#   GC_S3_SECRET_KEY         secret for access key robot-vault-gc
+#   INGEST_AUTH_TOKEN        the shared bearer token for the gRPC data plane
+#   INGEST_PROVISIONING_TOKEN dedicated bearer token for robot administration
+#   METRICS_AUTH_TOKEN       dedicated bearer token for the query metrics scrape
+#   INGEST_PUBLIC_HOST       DNS name on the ingest server certificate
+#   INGEST_TLS_CERT_FILE     absolute host path to the ingest certificate/chain
+#   INGEST_TLS_KEY_FILE      absolute host path to its private key
+#   INGEST_TLS_CA_FILE       the one root CA certificate that issued the ingest
+#                            certificate; robots pin it, query serves it at /ca.crt
+#                            and, under mtls, ingest trusts it for client certificates
+#   OIDC_ISSUER              exact issuer claim accepted from the identity provider
+#   OIDC_AUDIENCE            exact audience claim accepted by the query service
+#   OIDC_JWKS_URL            HTTPS endpoint used to verify token signatures
+#   OIDC_CLIENT_ID           public OAuth client registered for the browser SPA
+#   OIDC_AUTHORIZATION_URL   explicit HTTPS browser authorization endpoint
+#   OIDC_TOKEN_URL           explicit HTTPS browser token endpoint
+#   QUERY_PUBLIC_HOST        DNS name on the query certificate (no scheme/port)
+#   QUERY_TLS_CERT_FILE      absolute host path to the query certificate/chain
+#   QUERY_TLS_KEY_FILE       absolute host path to its private key
+#   QUERY_TLS_CA_FILE        host CA bundle Prometheus uses to verify query TLS
+#
+# Private keys stay root-owned on the host and are group-readable only by the
+# two TLS-serving containers. The default numeric group is 10001; set the
+# optional ROBOT_VAULT_SECRETS_GID when the host's dedicated secrets group uses
+# a different GID, and provision query/ingest keys with that group.
+#
+# WARNING: a direct `docker compose` call without `--env-file` can auto-load the
+# repo-root DEVELOPMENT `.env` (`make secrets` writes it; it may carry local
+# credentials). A real deployment must pass its own:
+#
+#   docker compose --env-file /etc/robot-vault/release.env -f deploy/docker-compose.release.yml ...
+#
+# `make release-up RELEASE_ENV_FILE=/etc/robot-vault/release.env` does exactly
+# that and refuses to run without it. It also validates the file and TLS-file
+# permissions without evaluating the env file as shell code, and removes
+# inherited database/S3/OIDC/TLS/GC variables so the named file
+# is authoritative.
+#
+# ## Usage
+#
+#   make release-tag                  # tag the local images with $(VERSION)
+#   make core-images-pull             # or: pull the digests of release/core-images.lock.json
+#   make release-up EDITION=core \
+#     RELEASE_ENV_FILE=/etc/robot-vault/release.env
+#   make release-down RELEASE_ENV_FILE=/etc/robot-vault/release.env
+#
+# Or directly:
+# (Run the Make `release-config` preflight first; Compose alone cannot validate
+# certificate/key cryptography or compare the encoded database credentials.)
+#
+#   ROBOT_VAULT_EDITION=core SEGMENTATION_ENABLED=false \
+#     QA_ENABLED=false MEDIA_ENCODE_ENABLED=false \
+#     docker compose -p robot-vault-release \
+#     --env-file /etc/robot-vault/release.env \
+#     -f deploy/docker-compose.release.yml up -d --remove-orphans
+
+# Non-secret process defaults shared by first-party one-shots and runtimes.
+# Credentials are deliberately absent: every service declares its own database
+# URI and object-store key below, so an env-file inherited from development
+# cannot silently restore the former shared-owner/root deployment.
+x-runtime-env: &runtime-env
+  HOME: /tmp/robot-vault
+  XDG_CACHE_HOME: /tmp/robot-vault/.cache
+  TMPDIR: /tmp
+
+# Non-secret object-store contract shared by every reader, writer and deleter.
+# A Compose `environment:` entry overrides the committed development env files.
+x-storage-env: &storage-env
+  <<: *runtime-env
+  # The release
+  # topology ships its own object store, so its internal endpoint and transport are
+  # fixed; bucket and region remain deployment inputs and are propagated to
+  # every service instead of drifting through three committed env files.
+  S3_BUCKET: ${S3_BUCKET:-robotics-data}
+  S3_PARQUET_BUCKET: ${S3_BUCKET:-robotics-data}
+  S3_ENDPOINT: "http://objectstore:9000"
+  S3_REGION: ${S3_REGION:-us-east-1}
+  S3_SECURE: "false"
+
+# Bound the default json-file logger so a noisy or crash-looping service cannot
+# exhaust the release host. Operators may tighten these two values in the
+# deployment env after measuring their normal log volume.
+x-default-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: ${ROBOT_VAULT_LOG_MAX_SIZE:-25m}
+    max-file: ${ROBOT_VAULT_LOG_MAX_FILES:-5}
+
+# Baseline for every first-party release process.  The matching `robotvault`
+# account (UID/GID 10001) is present in each image; specifying the numeric IDs
+# here also makes the policy reviewable after Compose has rendered the file.
+# Stateful third-party images are intentionally not merged into this anchor:
+# their entrypoints perform their own privilege drop and need image-specific
+# writable paths during initialization.
+x-first-party-runtime: &first-party-runtime
+  user: "10001:10001"
+  init: true
+  read_only: true
+  pids_limit: ${FIRST_PARTY_PIDS_LIMIT:-512}
+  logging: *default-logging
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  tmpfs:
+    - /tmp:rw,noexec,nosuid,nodev,size=64m,mode=1777
+
+services:
+  postgres:
+    image: postgres:16.4-alpine@sha256:5660c2cbfea50c7a9127d17dc4e48543eedd3d7a41a595a2dfa572471e37e64c
+    restart: unless-stopped
+    mem_limit: ${POSTGRES_MEMORY_LIMIT:-4g}
+    cpus: ${POSTGRES_CPU_LIMIT:-2.0}
+    pids_limit: ${POSTGRES_PIDS_LIMIT:-512}
+    shm_size: ${POSTGRES_SHM_SIZE:-256m}
+    logging: *default-logging
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-robotvault}
+      - POSTGRES_USER=${POSTGRES_USER:-robotvault}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD for a release deployment}
+    # Schema creation goes through the migration runner, the same single path
+    # the development stack uses from an empty database.
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-robotvault} -d ${POSTGRES_DB:-robotvault}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # Object store: RustFS (our image on the pinned upstream digest) configured exactly as
+  # development/objectstore/CONTRACT.md says (strict durability, 15-day stale
+  # multipart expiry, no console, S3 port 9000 on the Compose network only).
+  # The root password reaches the store only as a Compose secret file.
+  objectstore:
+    image: robot-vault-objectstore:${ROBOT_VAULT_VERSION:?set ROBOT_VAULT_VERSION (see the VERSION file)}
+    pull_policy: never
+    restart: unless-stopped
+    mem_limit: ${OBJECTSTORE_MEMORY_LIMIT:-4g}
+    cpus: ${OBJECTSTORE_CPU_LIMIT:-2.0}
+    pids_limit: ${OBJECTSTORE_PIDS_LIMIT:-512}
+    logging: *default-logging
+    environment:
+      RUSTFS_ACCESS_KEY: ${OBJECTSTORE_ROOT_USER:?set OBJECTSTORE_ROOT_USER}
+      RUSTFS_SECRET_KEY_FILE: /run/secrets/objectstore_root_password
+      RUSTFS_VOLUMES: /data
+      RUSTFS_ADDRESS: "0.0.0.0:9000"
+      RUSTFS_CONSOLE_ENABLE: "false"
+      RUSTFS_DURABILITY_MODE: strict
+      RUSTFS_DRIVE_SYNC_ENABLE: "true"
+      RUSTFS_NEW_BUCKET_DURABILITY_MODE: strict
+      RUSTFS_PUT_RENAME_EARLY_ACK_ENABLE: "false"
+      # Ingest keeps a resumable session for up to 14 days; the RustFS default
+      # (24h) would abort its multipart upload. Write exactly `360h`.
+      RUSTFS_API_STALE_UPLOADS_EXPIRY: 360h
+      RUSTFS_API_STALE_UPLOADS_CLEANUP_INTERVAL: 6h
+    secrets: [objectstore_root_password]
+    volumes:
+      - objectstore_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://127.0.0.1:9000/health/ready"]
+      interval: 5s
+      timeout: 3s
+      retries: 24
+      start_period: 5s
+
+  # One-shot bucket and access bootstrap (development/objectstore/bootstrap.py,
+  # SigV4 to the RustFS admin API, no admin CLI, no secret on a command line).
+  # The root password and all five runtime secrets exist only in this
+  # short-lived container, which release-up removes after `up`. (Compose cannot
+  # place a secret file in a read-only container, so they come as environment
+  # here; the store itself reads the root password only from its secret file.) Each
+  # service receives one fixed access key and one policy after this exits
+  # successfully. The reviewed script and policies arrive as Compose configs
+  # from the same clean checkout.
+  objectstore-access-ready:
+    <<: *first-party-runtime
+    image: robot-vault-toolkit:${ROBOT_VAULT_VERSION:?set ROBOT_VAULT_VERSION (see the VERSION file)}
+    pull_policy: never
+    restart: "no"
+    mem_limit: ${OBJECTSTORE_BOOTSTRAP_MEMORY_LIMIT:-512m}
+    cpus: ${OBJECTSTORE_BOOTSTRAP_CPU_LIMIT:-1.0}
+    depends_on:
+      objectstore:
+        condition: service_healthy
+    environment:
+      <<: *runtime-env
+      OBJECTSTORE_ROOT_USER: ${OBJECTSTORE_ROOT_USER:?set OBJECTSTORE_ROOT_USER}
+      OBJECTSTORE_ROOT_PASSWORD: ${OBJECTSTORE_ROOT_PASSWORD:?set OBJECTSTORE_ROOT_PASSWORD}
+      S3_BUCKET: ${S3_BUCKET:-robotics-data}
+      S3_ENDPOINT: http://objectstore:9000
+      S3_REGION: ${S3_REGION:-us-east-1}
+      INGEST_S3_ACCESS_KEY: robot-vault-ingest
+      INGEST_S3_SECRET_KEY: ${INGEST_S3_SECRET_KEY:?set INGEST_S3_SECRET_KEY for the release ingest user}
+      PROCESSOR_S3_ACCESS_KEY: robot-vault-processor
+      PROCESSOR_S3_SECRET_KEY: ${PROCESSOR_S3_SECRET_KEY:?set PROCESSOR_S3_SECRET_KEY for the release processor user}
+      EXPORTER_S3_ACCESS_KEY: robot-vault-exporter
+      EXPORTER_S3_SECRET_KEY: ${EXPORTER_S3_SECRET_KEY:?set EXPORTER_S3_SECRET_KEY for the release exporter user}
+      QUERY_S3_ACCESS_KEY: robot-vault-query
+      QUERY_S3_SECRET_KEY: ${QUERY_S3_SECRET_KEY:?set QUERY_S3_SECRET_KEY for the release query user}
+      GC_S3_ACCESS_KEY: robot-vault-gc
+      GC_S3_SECRET_KEY: ${GC_S3_SECRET_KEY:?set GC_S3_SECRET_KEY for the release GC user}
+    configs:
+      - source: objectstore_bootstrap
+        target: /release/objectstore_bootstrap.py
+        mode: 0444
+      - source: objectstore_policy_ingest
+        target: /release/objectstore-policies/ingest.json
+        mode: 0444
+      - source: objectstore_policy_processor
+        target: /release/objectstore-policies/processor.json
+        mode: 0444
+      - source: objectstore_policy_exporter
+        target: /release/objectstore-policies/exporter.json
+        mode: 0444
+      - source: objectstore_policy_query
+        target: /release/objectstore-policies/query.json
+        mode: 0444
+      - source: objectstore_policy_gc
+        target: /release/objectstore-policies/gc.json
+        mode: 0444
+    entrypoint: ["python3", "/release/objectstore_bootstrap.py"]
+
+  # Valkey 8.1 (BSD-3-Clause), the Redis-protocol server, instead of Redis 7.4
+  # (RSALv2/SSPLv1). The service keeps the
+  # name `redis` and clients keep `redis://`; the protocol is the same.
+  redis:
+    image: valkey/valkey:8.1.11-alpine@sha256:2602ace2be6569bc2bbb06f873776516ab9089821525be34f4305c67eb9db02a
+    restart: unless-stopped
+    mem_limit: ${REDIS_MEMORY_LIMIT:-1g}
+    cpus: ${REDIS_CPU_LIMIT:-1.0}
+    pids_limit: ${REDIS_PIDS_LIMIT:-256}
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # One-shot schema migration, run to completion before any app service starts.
+  # `restart: "no"` is deliberate: this must run exactly once per bring-up, and
+  # a restarting migrator would hide a genuinely failing migration behind a
+  # retry loop. It runs `python3 -m db.migrate` from the toolkit image.
+  db-migrate:
+    <<: *first-party-runtime
+    image: robot-vault-toolkit:${ROBOT_VAULT_VERSION:?set ROBOT_VAULT_VERSION (see the VERSION file) — a release never runs :latest}
+    pull_policy: never
+    restart: "no"
+    mem_limit: ${DB_MIGRATE_MEMORY_LIMIT:-1g}
+    cpus: ${DB_MIGRATE_CPU_LIMIT:-1.0}
+    working_dir: /app
+    environment:
+      <<: *runtime-env
+      # Bootstrap-owner credentials never flow into a long-running runtime.
+      DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL to the percent-encoded PostgreSQL owner URI}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["python3", "-m", "db.migrate"]
+
+  # One-shot database authority bootstrap, deliberately sequenced after every
+  # migration. The owner URI and all runtime DSNs exist together only here;
+  # the script creates/rotates fixed LOGIN roles, revokes inherited authority,
+  # applies the checked-in table/column matrix, and verifies effective ACLs in
+  # one transaction before any long-running service can start.
+  postgres-roles-ready:
+    <<: *first-party-runtime
+    image: robot-vault-toolkit:${ROBOT_VAULT_VERSION:?set ROBOT_VAULT_VERSION (see the VERSION file)}
+    pull_policy: never
+    restart: "no"
+    mem_limit: ${DB_BOOTSTRAP_MEMORY_LIMIT:-1g}
+    cpus: ${DB_BOOTSTRAP_CPU_LIMIT:-1.0}
+    working_dir: /app
+    environment:
+      <<: *runtime-env
+      DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL to the percent-encoded PostgreSQL owner URI}
+      INGEST_DATABASE_URL: ${INGEST_DATABASE_URL:?set INGEST_DATABASE_URL for role robot_vault_ingest}
+      PROCESSOR_DATABASE_URL: ${PROCESSOR_DATABASE_URL:?set PROCESSOR_DATABASE_URL for role robot_vault_processor}
+      EXPORTER_DATABASE_URL: ${EXPORTER_DATABASE_URL:?set EXPORTER_DATABASE_URL for role robot_vault_exporter}
+      QUERY_DATABASE_URL: ${QUERY_DATABASE_URL:?set QUERY_DATABASE_URL for role robot_vault_query}
+      GC_DATABASE_URL: ${GC_DATABASE_URL:?set GC_DATABASE_URL for role robot_vault_gc}
+    depends_on:
+      db-migrate:
+        condition: service_completed_successfully
+    command: ["python3", "-m", "release.bootstrap_postgres_roles"]
+
+  ingest:
+    <<: *first-party-runtime
+    image: robot-vault-ingest:${ROBOT_VAULT_VERSION:?set ROBOT_VAULT_VERSION (see the VERSION file)}
+    pull_policy: never
+    restart: unless-stopped
+    mem_limit: ${INGEST_MEMORY_LIMIT:-2g}
+    cpus: ${INGEST_CPU_LIMIT:-2.0}
+    pids_limit: ${INGEST_PIDS_LIMIT:-512}
+    env_file:
+      - ../configs/ingest.env
+    group_add:
+      - "${ROBOT_VAULT_SECRETS_GID:-10001}"
+    environment:
+      <<: *storage-env
+      DATABASE_URL: ${INGEST_DATABASE_URL:?set INGEST_DATABASE_URL for role robot_vault_ingest}
+      AWS_ACCESS_KEY_ID: robot-vault-ingest
+      AWS_SECRET_ACCESS_KEY: ${INGEST_S3_SECRET_KEY:?set INGEST_S3_SECRET_KEY for the release ingest user}
+      INGEST_AUTH_TOKEN: ${INGEST_AUTH_TOKEN:?set INGEST_AUTH_TOKEN for a release deployment}
+      INGEST_PROVISIONING_TOKEN: ${INGEST_PROVISIONING_TOKEN:?set INGEST_PROVISIONING_TOKEN for release robot provisioning}
+      INGEST_PUBLIC_HOST: ${INGEST_PUBLIC_HOST:?set INGEST_PUBLIC_HOST to the DNS name on the ingest certificate}
+      # Robots are told to upload to INGEST_PUBLIC_HOST:INGEST_PUBLIC_PORT,
+      # the published port below, not the container port.
+      INGEST_PUBLIC_PORT: ${INGEST_GRPC_PORT:-50051}
+      # `token` (default): TLS plus a per-robot bearer credential; one-line
+      # robot onboarding uses it. `mtls`: TLS plus a client certificate with a
+      # SPIFFE identity; robots are set up by hand. Ingest derives TLS_MTLS
+      # from the profile. The release preflight accepts only these two values.
+      INGEST_SECURITY_PROFILE: ${INGEST_SECURITY_PROFILE:-token}
+      TLS_ENABLED: "true"
+      TLS_SERVER_CERT: /run/robot-vault/tls/ingest.crt
+      TLS_SERVER_KEY: /run/robot-vault/tls/ingest.key
+      TLS_CA_CERT: /run/robot-vault/tls/ingest-ca.pem
+    ports:
+      # The only externally reachable ingest socket. The plaintext admin port
+      # remains Compose-network-only and exists solely for probes/metrics.
+      - "${INGEST_GRPC_PORT:-50051}:50051"
+    volumes:
+      # Upload staging, shared read-only with query. A named volume, not
+      # ./uploads: release state lives in Docker volumes so it is not entangled
+      # with a checkout.
+      - uploads:/app/uploads
+      # Mount only the server identity and the ingest CA certificate ingest
+      # needs. In particular, never expose a CA private key or robot private
+      # keys by mounting the repository's whole certs directory.
+      - type: bind
+        source: ${INGEST_TLS_CERT_FILE:?set INGEST_TLS_CERT_FILE to an absolute host certificate path}
+        target: /run/robot-vault/tls/ingest.crt
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${INGEST_TLS_KEY_FILE:?set INGEST_TLS_KEY_FILE to an absolute host private-key path}
+        target: /run/robot-vault/tls/ingest.key
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${INGEST_TLS_CA_FILE:?set INGEST_TLS_CA_FILE to the CA certificate that issued the ingest certificate}
+        target: /run/robot-vault/tls/ingest-ca.pem
+        read_only: true
+        bind:
+          create_host_path: false
+    healthcheck:
+      # /readyz performs both the S3 write/delete probe and a Postgres SELECT 1.
+      # It returns 503 when either dependency is unavailable.
+      # The ingest binary performs this loopback request itself, so the
+      # release runtime does not need curl solely for health checks.
+      test: ["CMD", "ingest-server", "--healthcheck"]
+      interval: 5s
+      timeout: 10s
+      retries: 30
+    depends_on:
+      objectstore:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      db-migrate:
+        condition: service_completed_successfully
+      postgres-roles-ready:
+        condition: service_completed_successfully
+      objectstore-access-ready:
+        condition: service_completed_successfully
+
+  processor:
+    <<: *first-party-runtime
+    image: robot-vault-core-processor:${ROBOT_VAULT_VERSION:?set ROBOT_VAULT_VERSION (see the VERSION file)}
+    pull_policy: never
+    restart: unless-stopped
+    mem_limit: ${PROCESSOR_MEMORY_LIMIT:-8g}
+    cpus: ${PROCESSOR_CPU_LIMIT:-4.0}
+    pids_limit: ${PROCESSOR_PIDS_LIMIT:-1024}
+    working_dir: /app
+    env_file:
+      - ../configs/processor.env
+    environment:
+      # (c) of the three edition gates — see the header. The processor uses
+      # ROBOT_VAULT_EDITION for segmentation's safe default and rejects
+      # core+true; release still pins and validates all three stage flags.
+      <<: *storage-env
+      DATABASE_URL: ${PROCESSOR_DATABASE_URL:?set PROCESSOR_DATABASE_URL for role robot_vault_processor}
+      AWS_ACCESS_KEY_ID: robot-vault-processor
+      AWS_SECRET_ACCESS_KEY: ${PROCESSOR_S3_SECRET_KEY:?set PROCESSOR_S3_SECRET_KEY for the release processor user}
+      ROBOT_VAULT_EDITION: ${ROBOT_VAULT_EDITION:?set ROBOT_VAULT_EDITION to core or pro}
+      SEGMENTATION_ENABLED: ${SEGMENTATION_ENABLED:?set SEGMENTATION_ENABLED consistently with ROBOT_VAULT_EDITION}
+      QA_ENABLED: ${QA_ENABLED:?set QA_ENABLED consistently with ROBOT_VAULT_EDITION}
+      MEDIA_ENCODE_ENABLED: ${MEDIA_ENCODE_ENABLED:?set MEDIA_ENCODE_ENABLED consistently with ROBOT_VAULT_EDITION}
+      PROCESSOR_MAX_ATTEMPTS: ${PROCESSOR_MAX_ATTEMPTS:-3}
+      # Camera frames can be much larger than the bounded /tmp tmpfs. Keep the
+      # spool on a private named volume and let the processor remove each
+      # per-upload directory after publication.
+      MEDIA_SPOOL_DIR: /var/lib/robot-vault/processor
+    volumes:
+      - processor_work:/var/lib/robot-vault/processor
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import os, urllib.request, psycopg; urllib.request.urlopen('http://127.0.0.1:8000/metrics', timeout=2).read(1); psycopg.connect(os.environ['DATABASE_URL'], connect_timeout=3).close()"]
+      interval: 5s
+      timeout: 8s
+      retries: 30
+    depends_on:
+      ingest:
+        condition: service_healthy
+      db-migrate:
+        condition: service_completed_successfully
+      postgres-roles-ready:
+        condition: service_completed_successfully
+      objectstore-access-ready:
+        condition: service_completed_successfully
+    command: ["python3", "-m", "processor.cli", "--watch", "--interval", "5"]
+
+  query:
+    <<: *first-party-runtime
+    image: robot-vault-core-query:${ROBOT_VAULT_VERSION:?set ROBOT_VAULT_VERSION (see the VERSION file)}
+    pull_policy: never
+    restart: unless-stopped
+    mem_limit: ${QUERY_MEMORY_LIMIT:-4g}
+    cpus: ${QUERY_CPU_LIMIT:-2.0}
+    pids_limit: ${QUERY_PIDS_LIMIT:-512}
+    working_dir: /app
+    env_file:
+      # Release-safe, non-secret defaults only.  The development query.env
+      # intentionally enables the local token issuer and must never be loaded
+      # by this topology.
+      - ../configs/query.release.env
+    group_add:
+      - "${ROBOT_VAULT_SECRETS_GID:-10001}"
+    environment:
+      # (a) of the three edition gates, and the authoritative one for the API
+      # surface: in core this app mounts no episodes/datasets routes.
+      <<: *storage-env
+      DATABASE_URL: ${QUERY_DATABASE_URL:?set QUERY_DATABASE_URL for role robot_vault_query}
+      AWS_ACCESS_KEY_ID: robot-vault-query
+      AWS_SECRET_ACCESS_KEY: ${QUERY_S3_SECRET_KEY:?set QUERY_S3_SECRET_KEY for the release query user}
+      # Fixed private origin only. Query sends the provisioning token nowhere
+      # else and ingest's admin listener has no host publication.
+      INGEST_PROVISIONING_TOKEN: ${INGEST_PROVISIONING_TOKEN:?set INGEST_PROVISIONING_TOKEN for release robot provisioning}
+      INGEST_PROVISIONING_UPSTREAM: "http://ingest:8080"
+      ROBOT_VAULT_EDITION: ${ROBOT_VAULT_EDITION:?set ROBOT_VAULT_EDITION to core or pro}
+      ROBOT_VAULT_VERSION: ${ROBOT_VAULT_VERSION:?set ROBOT_VAULT_VERSION from the source VERSION file}
+      # Authentication is not operator-selectable in a release.  Explicit
+      # environment entries override env_file values, so even a malformed
+      # release defaults file cannot re-enable the unsigned development path.
+      ROBOT_VAULT_RELEASE: "true"
+      AUTH_MODE: "oidc"
+      OIDC_DEV: "false"
+      OIDC_ALGORITHMS: "RS256"
+      OIDC_ROLE_SOURCE: "claim"
+      OIDC_ISSUER: ${OIDC_ISSUER:?set OIDC_ISSUER for a release deployment}
+      OIDC_AUDIENCE: ${OIDC_AUDIENCE:?set OIDC_AUDIENCE for a release deployment}
+      OIDC_JWKS_URL: ${OIDC_JWKS_URL:?set OIDC_JWKS_URL for a release deployment}
+      OIDC_ROLE_CLAIM: ${OIDC_ROLE_CLAIM:-roles}
+      # Public-client values consumed by /api/v1/auth/config. There is no
+      # client secret: the browser uses Authorization Code + PKCE.
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:?set OIDC_CLIENT_ID for the release browser client}
+      OIDC_AUTHORIZATION_URL: ${OIDC_AUTHORIZATION_URL:?set OIDC_AUTHORIZATION_URL for browser login}
+      OIDC_TOKEN_URL: ${OIDC_TOKEN_URL:?set OIDC_TOKEN_URL for browser token exchange}
+      OIDC_END_SESSION_URL: ${OIDC_END_SESSION_URL:-}
+      OIDC_SCOPES: ${OIDC_SCOPES:-openid profile email offline_access}
+      QUERY_PUBLIC_HOST: ${QUERY_PUBLIC_HOST:?set QUERY_PUBLIC_HOST to the DNS name on the query certificate}
+      # This topology terminates TLS in Uvicorn itself, so the application
+      # observes an HTTPS request and emits HSTS on every response.
+      ENABLE_HSTS: "true"
+      PROMETHEUS_BASE: "http://prometheus:9090"
+      METRICS_AUTH_TOKEN: ${METRICS_AUTH_TOKEN:?set a dedicated METRICS_AUTH_TOKEN for the release query scrape}
+      TIME_INDEX_CACHE_SIZE_MB: ${TIME_INDEX_CACHE_SIZE_MB:-512}
+      # Admission and execution ceilings remain operator-tunable in the
+      # release topology. These defaults match query_service.settings.
+      DUCKDB_THREADS: ${DUCKDB_THREADS:-2}
+      DUCKDB_MEMORY_LIMIT_MB: ${DUCKDB_MEMORY_LIMIT_MB:-512}
+      DUCKDB_QUERY_CONCURRENCY: ${DUCKDB_QUERY_CONCURRENCY:-4}
+      DUCKDB_QUERY_ACQUIRE_TIMEOUT_SECONDS: ${DUCKDB_QUERY_ACQUIRE_TIMEOUT_SECONDS:-5}
+      DUCKDB_QUERY_TIMEOUT_SECONDS: ${DUCKDB_QUERY_TIMEOUT_SECONDS:-30}
+      QUERY_MAX_SOURCE_RANGE_SECONDS: ${QUERY_MAX_SOURCE_RANGE_SECONDS:-2678400}
+      QUERY_MAX_SOURCE_FILES: ${QUERY_MAX_SOURCE_FILES:-5000}
+      QUERY_MAX_SOURCE_ROWS: ${QUERY_MAX_SOURCE_ROWS:-10000000}
+      QUERY_MAX_SOURCE_BYTES: ${QUERY_MAX_SOURCE_BYTES:-21474836480}
+      SQL_CONSOLE_MEMORY_LIMIT_MB: ${SQL_CONSOLE_MEMORY_LIMIT_MB:-512}
+      # DuckDB may spill large joins/scans. Its baked httpfs extensions stay
+      # under immutable /opt; only spill data lands on this private volume.
+      DUCKDB_TEMP_DIRECTORY: /var/lib/robot-vault/query
+      # MCP server at /mcp (core). It needs real OIDC (always on here) and the
+      # public origin that agents use; Host values other than that origin and
+      # loopback get 421. Set PUBLIC_BASE_URL when the front door is not port 443.
+      MCP_ENABLED: ${MCP_ENABLED:-true}
+      MCP_WRITE_TOOLS: ${MCP_WRITE_TOOLS:-false}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-https://${QUERY_PUBLIC_HOST}}
+      # Served without auth at GET /ca.crt: robots fetch it and check it
+      # against the pin in their enrollment code. Same host file as ingest's.
+      INGEST_CA_CERT_FILE: /run/robot-vault/tls/ingest-ca.pem
+    ports:
+      # The only published query port (ingest gRPC is the other external
+      # socket). There is no plaintext query listener or redirect service.
+      - "${QUERY_HTTPS_PORT:-443}:8003"
+    volumes:
+      - uploads:/app/uploads:ro
+      - query_work:/var/lib/robot-vault/query
+      # Long bind syntax plus create_host_path:false makes a typo fatal rather
+      # than silently creating a directory where Uvicorn expected a file.
+      - type: bind
+        source: ${QUERY_TLS_CERT_FILE:?set QUERY_TLS_CERT_FILE to an absolute host certificate path}
+        target: /run/robot-vault/tls/query.crt
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${QUERY_TLS_KEY_FILE:?set QUERY_TLS_KEY_FILE to an absolute host private-key path}
+        target: /run/robot-vault/tls/query.key
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${INGEST_TLS_CA_FILE:?set INGEST_TLS_CA_FILE to the CA certificate that issued the ingest certificate}
+        target: /run/robot-vault/tls/ingest-ca.pem
+        read_only: true
+        bind:
+          create_host_path: false
+    command:
+      - uvicorn
+      - query_service.main:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8003"
+      - --ssl-certfile
+      - /run/robot-vault/tls/query.crt
+      - --ssl-keyfile
+      - /run/robot-vault/tls/query.key
+    healthcheck:
+      # Readiness exercises bounded JWKS initialization. Certificate identity
+      # alone is skipped because this same-container loopback address cannot
+      # match the public SAN; external clients validate the certificate and the
+      # release Prometheus scrape uses its explicit CA + server_name.
+      test: ["CMD", "python", "-c", "import ssl, urllib.request; urllib.request.urlopen('https://127.0.0.1:8003/readyz', timeout=8, context=ssl._create_unverified_context()).read()"]
+      interval: 5s
+      timeout: 10s
+      retries: 30
+    depends_on:
+      processor:
+        condition: service_healthy
+      objectstore:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      db-migrate:
+        condition: service_completed_successfully
+      postgres-roles-ready:
+        condition: service_completed_successfully
+      objectstore-access-ready:
+        condition: service_completed_successfully
+
+  # The single S3 deleter: there is exactly one. Dry-run stays ON
+  # by default here too — a release that starts silently deleting objects on
+  # day one is not a feature.
+  gc:
+    <<: *first-party-runtime
+    image: robot-vault-toolkit:${ROBOT_VAULT_VERSION:?set ROBOT_VAULT_VERSION (see the VERSION file)}
+    pull_policy: never
+    restart: unless-stopped
+    mem_limit: ${GC_MEMORY_LIMIT:-2g}
+    cpus: ${GC_CPU_LIMIT:-1.0}
+    pids_limit: ${GC_PIDS_LIMIT:-256}
+    working_dir: /app
+    environment:
+      <<: *storage-env
+      DATABASE_URL: ${GC_DATABASE_URL:?set GC_DATABASE_URL for role robot_vault_gc}
+      AWS_ACCESS_KEY_ID: robot-vault-gc
+      AWS_SECRET_ACCESS_KEY: ${GC_S3_SECRET_KEY:?set GC_S3_SECRET_KEY for the release GC user}
+      GC_MIN_AGE_HOURS: ${GC_MIN_AGE_HOURS:-24}
+      GC_MPU_MAX_AGE_HOURS: ${GC_MPU_MAX_AGE_HOURS:-24}
+      GC_DELETE_LIMIT: ${GC_DELETE_LIMIT:-2000}
+      GC_DRY_RUN: ${GC_DRY_RUN:-true}
+      GC_PREFIXES: ${GC_PREFIXES:-raw/,manifests/,processed/parquet/,cas/files/,processed/media/,qa/reports/,exports/}
+      GC_INTERVAL_SECONDS: ${GC_INTERVAL_SECONDS:-3600}
+      # Internal scrape contract; not a published operator port.
+      METRICS_PORT: "9108"
+      GC_CONFIG_PATH: "/app/configs/gc.yaml"
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import os, urllib.request, psycopg; urllib.request.urlopen('http://127.0.0.1:9108/metrics', timeout=2).read(1); psycopg.connect(os.environ['DATABASE_URL'], connect_timeout=3).close()"]
+      interval: 5s
+      timeout: 8s
+      retries: 30
+    # No published metrics port, unlike the dev file: Prometheus scrapes it
+    # over the compose network.
+    entrypoint: ["/bin/sh","-c","sh /app/tools/gc_runner.sh"]
+    depends_on:
+      objectstore:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      db-migrate:
+        condition: service_completed_successfully
+      postgres-roles-ready:
+        condition: service_completed_successfully
+      objectstore-access-ready:
+        condition: service_completed_successfully
+
+  # Optional SELECT-only role bootstrap. The normal release role
+  # contract remains unchanged when the observability profile is disabled.
+  ops-roles-ready:
+    <<: *first-party-runtime
+    image: robot-vault-toolkit:${ROBOT_VAULT_VERSION:?set ROBOT_VAULT_VERSION (see the VERSION file)}
+    pull_policy: never
+    profiles: ["obs"]
+    restart: "no"
+    mem_limit: 256m
+    cpus: 0.5
+    working_dir: /app
+    environment:
+      <<: *runtime-env
+      DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL for release role bootstrap}
+      OPS_DATABASE_URL: ${OPS_DATABASE_URL:-}
+    depends_on:
+      postgres-roles-ready:
+        condition: service_completed_successfully
+    command: ["python3", "-m", "release.bootstrap_postgres_roles", "--ops-only"]
+
+  # Read-only source collector; its only listener is on the Compose network.
+  ops-metrics:
+    <<: *first-party-runtime
+    image: robot-vault-toolkit:${ROBOT_VAULT_VERSION:?set ROBOT_VAULT_VERSION (see the VERSION file)}
+    pull_policy: never
+    profiles: ["obs"]
+    restart: unless-stopped
+    mem_limit: 256m
+    cpus: 0.5
+    pids_limit: 128
+    working_dir: /app
+    environment:
+      <<: *runtime-env
+      OPS_DATABASE_URL: ${OPS_DATABASE_URL:-}
+      ROBOT_VAULT_EDITION: ${ROBOT_VAULT_EDITION:?set ROBOT_VAULT_EDITION to core or pro}
+      PROCESSOR_MAX_ATTEMPTS: ${PROCESSOR_MAX_ATTEMPTS:-3}
+      EXPORTER_MAX_ATTEMPTS: ${EXPORTER_MAX_ATTEMPTS:-3}
+    volumes:
+      - pg_data:/run/robot-vault/volumes/database:ro
+      - objectstore_data:/run/robot-vault/volumes/object_store:ro
+      - uploads:/run/robot-vault/volumes/uploads:ro
+      - processor_work:/run/robot-vault/volumes/processor_spool:ro
+      - type: bind
+        source: ${BACKUP_METRICS_DIR:-/var/lib/robot-vault/backup-metrics}
+        target: /run/robot-vault/backup-metrics
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${INGEST_TLS_CERT_FILE:?set INGEST_TLS_CERT_FILE to a public chain}
+        target: /run/robot-vault/tls/ingest.crt
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${QUERY_TLS_CERT_FILE:?set QUERY_TLS_CERT_FILE to a public chain}
+        target: /run/robot-vault/tls/query.crt
+        read_only: true
+        bind:
+          create_host_path: false
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:9110/metrics', timeout=15).read(1)"]
+      interval: 30s
+      timeout: 18s
+      retries: 3
+    depends_on:
+      ops-roles-ready:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+    command: ["python3", "-m", "tools.operational_metrics"]
+
+  # --- Observability, opt-in (`--profile obs`) --------------------------------
+  prometheus:
+    image: prom/prometheus:v2.55.1@sha256:2659f4c2ebb718e7695cb9b25ffa7d6be64db013daba13e05c875451cf51b0d3
+    profiles: ["obs"]
+    restart: unless-stopped
+    mem_limit: ${PROMETHEUS_MEMORY_LIMIT:-2g}
+    cpus: ${PROMETHEUS_CPU_LIMIT:-1.0}
+    pids_limit: ${PROMETHEUS_PIDS_LIMIT:-256}
+    logging: *default-logging
+    environment:
+      QUERY_PUBLIC_HOST: ${QUERY_PUBLIC_HOST:?set QUERY_PUBLIC_HOST to the DNS name on the query certificate}
+      ROBOT_VAULT_EDITION: ${ROBOT_VAULT_EDITION:?set ROBOT_VAULT_EDITION to core or pro}
+      METRICS_AUTH_TOKEN: ${METRICS_AUTH_TOKEN:?set a dedicated METRICS_AUTH_TOKEN for the release query scrape}
+      PROMETHEUS_RETENTION_TIME: ${PROMETHEUS_RETENTION_TIME:-30d}
+      PROMETHEUS_RETENTION_SIZE: ${PROMETHEUS_RETENTION_SIZE:-25GB}
+      ALERTMANAGER_ENDPOINT: ${ALERTMANAGER_ENDPOINT:-}
+    volumes:
+      - prometheus_data:/prometheus
+      - type: bind
+        source: ${QUERY_TLS_CA_FILE:?set QUERY_TLS_CA_FILE to a host CA bundle that verifies the query certificate}
+        target: /run/robot-vault/tls/query-ca.pem
+        read_only: true
+        bind:
+          create_host_path: false
+    # Rule and scrape files are loaded by glob, so an edition overlay adds its
+    # own files here instead of editing the generated config below.
+    configs:
+      - source: prometheus_release_alerts
+        target: /etc/prometheus/rules/release-alerts.yml
+        mode: 0444
+    # The shared development prometheus.yml uses plaintext HTTP and legacy
+    # container names, so release generates a small edition-aware config at
+    # startup. Validate both interpolated fields before writing it: this
+    # prevents a hostile value from injecting Prometheus configuration.
+    # Prometheus connects to Compose DNS `query`, but verifies the normal CA
+    # chain against the public name on the certificate. Verification is never
+    # disabled.
+    entrypoint: ["/bin/sh", "-eu", "-c"]
+    command:
+      - |
+        host="$${QUERY_PUBLIC_HOST}"
+        edition="$${ROBOT_VAULT_EDITION}"
+        metrics_token="$${METRICS_AUTH_TOKEN}"
+        alertmanager_endpoint="$${ALERTMANAGER_ENDPOINT}"
+        case "$${host}" in
+          ""|.*|*.|-*|*-|*..*|*.-*|*-.*|*[!A-Za-z0-9.-]*)
+            echo "invalid QUERY_PUBLIC_HOST: expected a DNS hostname without scheme or port" >&2
+            exit 64
+            ;;
+        esac
+        if [ "$${#host}" -gt 253 ]; then
+          echo "invalid QUERY_PUBLIC_HOST: hostname is longer than 253 characters" >&2
+          exit 64
+        fi
+        remaining="$${host}"
+        while :; do
+          label="$${remaining%%.*}"
+          if [ "$${#label}" -gt 63 ]; then
+            echo "invalid QUERY_PUBLIC_HOST: DNS label is longer than 63 characters" >&2
+            exit 64
+          fi
+          case "$${remaining}" in
+            *.*) remaining="$${remaining#*.}" ;;
+            *) break ;;
+          esac
+        done
+        case "$${edition}" in
+          core|pro) ;;
+          *)
+            echo "invalid ROBOT_VAULT_EDITION: expected core or pro" >&2
+            exit 64
+            ;;
+        esac
+        # Keep the secret out of the generated YAML and out of argv. Prometheus
+        # reads the 0600 file for its Authorization header.
+        umask 077
+        printf '%s' "$${metrics_token}" > /tmp/query-metrics-token
+        cat > /tmp/prometheus.release.yml <<EOF
+        global:
+          scrape_interval: 15s
+        rule_files:
+          - /etc/prometheus/rules/*.yml
+        scrape_config_files:
+          - /etc/prometheus/scrape.d/*.yml
+        scrape_configs:
+          - job_name: ingest
+            static_configs:
+              - targets: ['ingest:8080']
+            metrics_path: /metrics
+            scrape_interval: 10s
+          - job_name: query
+            static_configs:
+              - targets: ['query:8003']
+            scheme: https
+            tls_config:
+              server_name: $${host}
+              ca_file: /run/robot-vault/tls/query-ca.pem
+            authorization:
+              type: Bearer
+              credentials_file: /tmp/query-metrics-token
+            metrics_path: /metrics
+          - job_name: processor
+            static_configs:
+              - targets: ['processor:8000']
+            metrics_path: /metrics
+          - job_name: gc
+            static_configs:
+              - targets: ['gc:9108']
+          - job_name: ops
+            static_configs:
+              - targets: ['ops-metrics:9110']
+            scrape_interval: 30s
+            scrape_timeout: 15s
+        EOF
+        if [ -n "$${alertmanager_endpoint}" ]; then
+          case "$${alertmanager_endpoint}" in
+            http://*) alertmanager_scheme=http; alertmanager_target="$${alertmanager_endpoint#http://}" ;;
+            https://*) alertmanager_scheme=https; alertmanager_target="$${alertmanager_endpoint#https://}" ;;
+            *) echo "invalid ALERTMANAGER_ENDPOINT: expected http(s)://hostname:port" >&2; exit 64 ;;
+          esac
+          alertmanager_host="$${alertmanager_target%:*}"
+          alertmanager_port="$${alertmanager_target##*:}"
+          case "$${alertmanager_host}" in
+            ""|.*|*.|-*|*-|*..*|*.-*|*-.*|*[!A-Za-z0-9.-]*)
+              echo "invalid ALERTMANAGER_ENDPOINT hostname" >&2; exit 64 ;;
+          esac
+          if [ "$${alertmanager_host}" = "$${alertmanager_target}" ] ||
+             [ "$${#alertmanager_host}" -gt 253 ]; then
+            echo "invalid ALERTMANAGER_ENDPOINT hostname or port" >&2; exit 64
+          fi
+          case "$${alertmanager_port}" in
+            ""|*[!0-9]*) echo "invalid ALERTMANAGER_ENDPOINT port" >&2; exit 64 ;;
+          esac
+          if [ "$${#alertmanager_port}" -gt 5 ] ||
+             [ "$${alertmanager_port}" -lt 1 ] ||
+             [ "$${alertmanager_port}" -gt 65535 ]; then
+            echo "invalid ALERTMANAGER_ENDPOINT port" >&2; exit 64
+          fi
+          remaining="$${alertmanager_host}"
+          while :; do
+            label="$${remaining%%.*}"
+            if [ "$${#label}" -gt 63 ]; then
+              echo "invalid ALERTMANAGER_ENDPOINT hostname" >&2; exit 64
+            fi
+            case "$${remaining}" in
+              *.*) remaining="$${remaining#*.}" ;;
+              *) break ;;
+            esac
+          done
+          cat >> /tmp/prometheus.release.yml <<EOF
+        alerting:
+          alertmanagers:
+            - scheme: $${alertmanager_scheme}
+              static_configs:
+                - targets: ['$${alertmanager_target}']
+        EOF
+        fi
+        exec /bin/prometheus \
+          --config.file=/tmp/prometheus.release.yml \
+          --storage.tsdb.path=/prometheus \
+          --storage.tsdb.retention.time="$${PROMETHEUS_RETENTION_TIME}" \
+          --storage.tsdb.retention.size="$${PROMETHEUS_RETENTION_SIZE}"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:9090/-/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    depends_on:
+      ingest:
+        condition: service_healthy
+      query:
+        condition: service_healthy
+      ops-metrics:
+        condition: service_healthy
+
+secrets:
+  # Created by Compose from the deployment env file's OBJECTSTORE_ROOT_PASSWORD
+  # and mounted as a file; the store's environment never holds the value.
+  objectstore_root_password:
+    environment: OBJECTSTORE_ROOT_PASSWORD
+
+configs:
+  objectstore_bootstrap:
+    file: ../development/objectstore/bootstrap.py
+  objectstore_policy_ingest:
+    file: ../development/release/objectstore-policies/ingest.json
+  objectstore_policy_processor:
+    file: ../development/release/objectstore-policies/processor.json
+  objectstore_policy_exporter:
+    file: ../development/release/objectstore-policies/exporter.json
+  objectstore_policy_query:
+    file: ../development/release/objectstore-policies/query.json
+  objectstore_policy_gc:
+    file: ../development/release/objectstore-policies/gc.json
+  prometheus_release_alerts:
+    file: ../configs/prometheus/release-alerts.yml
+
+volumes:
+  pg_data:
+  objectstore_data:
+  uploads:
+  processor_work:
+  query_work:
+  prometheus_data:

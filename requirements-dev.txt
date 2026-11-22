@@ -1,0 +1,34 @@
+pytest>=7.4
+pytest-cov>=4.1
+# Spell the extra explicitly so hash-locked installs on the base image's pip
+# do not treat pytest-cov's transitive `coverage[toml]>=...` as unpinned.
+coverage[toml]>=7.10.6
+mypy>=1.9
+grpcio>=1.62
+grpcio-tools>=1.62
+protobuf>=4.25
+pyarrow>=16.1
+mcap>=1.2.1
+lz4>=4.3
+zstandard>=0.22
+prometheus-client>=0.20
+fastapi>=0.110
+uvicorn[standard]>=0.29
+duckdb>=1.0
+httpx>=0.27
+# Starlette's TestClient uses httpx2 when available; plain httpx support is
+# deprecated and remains here for the query service's outbound HTTP client.
+httpx2>=2.12,<3
+pytz>=2024.1
+psycopg[binary]>=3.2
+boto3>=1.34
+redis>=5.0
+psutil>=5.9
+# development/sim_gen: the deterministic simulation MCAP generator.
+# Exact pins, not floors, on purpose -- sim_gen's contract is byte-identical
+# output for a given seed, and both the CDR encoder and the JPEG encoder are
+# part of those bytes. Licences (checked at pin time):
+#   rosbags 0.10.11  Apache-2.0  (Ternaris) -- ROS 2 Humble typestore + CDR
+#   Pillow  13.0.0   MIT-CMU               -- synthetic camera frames
+rosbags==0.10.11
+Pillow==13.0.0

@@ -1,0 +1,23 @@
+[Unit]
+Description=Robot Vault upload agent schedule
+
+[Timer]
+OnBootSec=2min
+OnUnitInactiveSec=5min
+AccuracySec=30s
+# 50 robots must not stampede the vault after a site power cut.
+#
+# Do NOT put the comment after the value, like this:
+#   RandomizedDelaySec=60s     # 50 robots must not stampede ...
+# systemd unit files do not support trailing inline comments. Measured on
+# systemd 249 (ubuntu:22.04), `systemd-analyze verify` reports:
+#   Failed to parse sec value, ignoring: 60s     # 50 robots must not ...
+# -- it drops the WHOLE assignment and leaves RandomizedDelaySec at 0, so the
+# trailing-comment form silently disables the exact anti-stampede jitter it
+# names. The comment is therefore on its own line here.
+RandomizedDelaySec=60s
+Persistent=true
+Unit=ingotron-agent.service
+
+[Install]
+WantedBy=timers.target

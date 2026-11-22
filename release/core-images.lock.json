@@ -1,0 +1,12 @@
+{
+  "schema": 1,
+  "version": null,
+  "source_commit": null,
+  "images": {
+    "robot-vault-toolkit": null,
+    "robot-vault-ingest": null,
+    "robot-vault-core-processor": null,
+    "robot-vault-core-query": null,
+    "robot-vault-objectstore": null
+  }
+}

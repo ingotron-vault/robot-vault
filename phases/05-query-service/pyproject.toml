@@ -1,0 +1,39 @@
+[project]
+name = "robot-vault-query-service"
+version = "0.1.0"
+description = "Query API and minimal charts UI over Parquet"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi>=0.110",
+  "uvicorn[standard]>=0.29",
+  # Floor >=1.5, capped below the next major: the
+  # Dockerfile bakes the `httpfs` extension into the image at build time, version-keyed to whatever
+  # duckdb this pin resolves to in that same build -- an unbounded range
+  # would let a routine rebuild resolve a newer duckdb than the extension
+  # baked alongside it, breaking the air-gap install at runtime.
+  "duckdb>=1.5,<2",
+  "prometheus-client>=0.20",
+  "pytz>=2024.1",  # DuckDB needs pytz to return TIMESTAMPTZ results to Python.
+  "mcap>=1.2.1",
+  "redis>=5.0",
+  "psycopg[binary]>=3.2",
+  "boto3>=1.34",
+  "httpx>=0.27",
+  "PyJWT>=2.8",
+  # PyJWT's RS256 path and the OIDC JWKS key checks. Floor >=42, capped below the
+  # next major: this is load-bearing crypto
+  # whose API shape a major bump could move, and an unbounded range would
+  # let an air-gapped rebuild silently change the token-verification code.
+  # Licence (checked at pin time): Apache-2.0 OR BSD-3-Clause, dual.
+  "cryptography>=42,<51",
+  # MCP server at /mcp (docs/MCP.md). The official Python SDK, MIT
+  # (checked at pin time, 2026-11-20). 2.x is the first line that serves MCP
+  # revision 2026-07-28 next to the 2025-era initialize handshake; capped
+  # below the next major because the mount uses its session-manager API.
+  "mcp>=2.3,<3",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+

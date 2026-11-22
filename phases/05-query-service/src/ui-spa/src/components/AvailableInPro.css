@@ -1,0 +1,12 @@
+.rv-pro-panel {
+  display: grid;
+  gap: 8px;
+  max-width: 640px;
+  margin-top: 24px;
+  padding: 16px 20px;
+  border: 1px solid var(--rv-line);
+  border-radius: 8px;
+}
+.rv-pro-panel p { margin: 0; }
+.rv-pro-panel a { color: var(--rv-accent); text-decoration: underline; }
+.rv-pro-panel.is-compact { margin: 0; padding: 0; border: 0; }

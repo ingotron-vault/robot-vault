@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "robot-storage-manager"
+version = "0.1.0"
+description = "Offline-first robot local storage manager: scan, manifest, hash, retention"
+authors = [{ name = "Robot Vault" }]
+readme = "README.md"
+requires-python = ">=3.10"
+keywords = ["robotics", "storage", "mcap", "hashing", "retention"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Operating System :: POSIX :: Linux",
+]
+
+[project.scripts]
+rsm = "robot_storage_manager.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]

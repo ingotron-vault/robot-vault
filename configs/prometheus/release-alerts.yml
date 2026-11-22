@@ -1,0 +1,156 @@
+groups:
+  - name: robot-vault-availability
+    rules:
+      - alert: RobotVaultTargetDown
+        expr: up{job=~"ingest|query|processor|gc|ops"} == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Robot Vault target {{ $labels.job }} is unavailable"
+          description: "Prometheus has failed to scrape {{ $labels.instance }} for five minutes."
+
+      - alert: RobotVaultQueryServerErrors
+        expr: sum(rate(query_service_requests_total{status=~"5.."}[10m])) > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Robot Vault query API is returning server errors"
+          description: "At least one query endpoint has sustained HTTP 5xx responses for ten minutes."
+
+  - name: robot-vault-data-integrity
+    rules:
+      - alert: RobotVaultCompletedRowWriteFailure
+        expr: increase(completed_row_write_failures_total[5m]) > 0
+        labels:
+          severity: critical
+        annotations:
+          summary: "An uploaded object could not be committed to PostgreSQL"
+          description: "Inspect ingest logs and reconcile S3 with the uploads table before retrying clients."
+
+      - alert: RobotVaultGarbageCollectionFailure
+        expr: increase(gc_runs_failure_total[30m]) > 0
+        labels:
+          severity: warning
+        annotations:
+          summary: "Robot Vault garbage collection failed"
+          description: "A GC pass failed. Object retention may grow until the underlying error is corrected."
+
+      - alert: RobotVaultRateLimitRedisDegraded
+        expr: increase(query_service_rate_limit_redis_degradations_total[15m]) > 0
+        labels:
+          severity: warning
+        annotations:
+          summary: "Query rate limiting fell back from Redis"
+          description: "Rate limits are process-local until Redis connectivity is restored."
+
+  - name: robot-vault-query-capacity
+    rules:
+      - alert: RobotVaultQuerySaturated
+        expr: max(query_service_query_active) / clamp_min(max(query_service_query_capacity), 1) >= 0.9
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Robot Vault query capacity is saturated"
+          description: "At least 90 percent of configured query permits have been active for ten minutes."
+
+      - alert: RobotVaultQueryCapacityRejections
+        expr: sum(increase(query_service_query_admission_rejections_total{reason="capacity"}[15m])) > 0
+        labels:
+          severity: warning
+        annotations:
+          summary: "Robot Vault rejected queries at its concurrency ceiling"
+          description: "Inspect query load and the configured concurrency, acquire timeout, and memory ceilings before raising capacity."
+
+      - alert: RobotVaultQueryTimeouts
+        expr: sum(increase(query_service_query_timeouts_total[15m])) > 0
+        labels:
+          severity: warning
+        annotations:
+          summary: "Robot Vault query deadlines were exceeded"
+          description: "One or more bounded DuckDB executions reached their execution deadline in the last 15 minutes."
+
+  - name: robot-vault-operational-capacity
+    rules:
+      - alert: RobotVaultVolumeNearFull
+        expr: robot_vault_volume_available_bytes / robot_vault_volume_total_bytes < 0.10
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Robot Vault {{ $labels.volume }} volume has less than 10% free"
+          runbook_url: "https://github.com/ingotron-vault/robot-vault/blob/main/docs/OPERATIONS.md#disk-and-object-capacity"
+
+      - alert: RobotVaultVolumeCritical
+        expr: robot_vault_volume_available_bytes / robot_vault_volume_total_bytes < 0.05
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Robot Vault {{ $labels.volume }} volume has less than 5% free"
+          runbook_url: "https://github.com/ingotron-vault/robot-vault/blob/main/docs/OPERATIONS.md#disk-and-object-capacity"
+
+      - alert: RobotVaultBacklogOld
+        expr: (robot_vault_backlog_age_seconds > 3600) and on(queue) (robot_vault_backlog_items > 0)
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Robot Vault {{ $labels.queue }} backlog has waited over one hour"
+          runbook_url: "https://github.com/ingotron-vault/robot-vault/blob/main/docs/OPERATIONS.md#backlog-age"
+
+      - alert: RobotVaultBackupMissing
+        expr: robot_vault_backup_last_success_timestamp_seconds == 0
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "No successful Robot Vault backup has been recorded"
+          runbook_url: "https://github.com/ingotron-vault/robot-vault/blob/main/docs/OPERATIONS.md#backup-freshness"
+
+      - alert: RobotVaultBackupStale
+        expr: (robot_vault_backup_last_success_timestamp_seconds > 0) and (time() - robot_vault_backup_last_success_timestamp_seconds > 93600)
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Robot Vault backup is older than 26 hours"
+          runbook_url: "https://github.com/ingotron-vault/robot-vault/blob/main/docs/OPERATIONS.md#backup-freshness"
+
+      - alert: RobotVaultBackupLastRunFailed
+        expr: robot_vault_backup_last_run_success == 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "The last Robot Vault backup attempt failed"
+          runbook_url: "https://github.com/ingotron-vault/robot-vault/blob/main/docs/OPERATIONS.md#backup-freshness"
+
+      - alert: RobotVaultCertificateExpiring
+        expr: robot_vault_certificate_expiry_timestamp_seconds - time() < 1209600
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Robot Vault {{ $labels.certificate }} public certificate chain expires within 14 days"
+          runbook_url: "https://github.com/ingotron-vault/robot-vault/blob/main/docs/OPERATIONS.md#certificate-expiry"
+
+      - alert: RobotVaultOperationalCollectionFailed
+        expr: robot_vault_operational_collection_success == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Robot Vault {{ $labels.source }} operational metrics collection failed"
+          runbook_url: "https://github.com/ingotron-vault/robot-vault/blob/main/docs/OPERATIONS.md#collection-failure"
+
+      - alert: RobotVaultOperationalCollectionStale
+        expr: time() - robot_vault_operational_last_success_timestamp_seconds > 180
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Robot Vault {{ $labels.source }} operational metrics are stale"
+          runbook_url: "https://github.com/ingotron-vault/robot-vault/blob/main/docs/OPERATIONS.md#collection-failure"

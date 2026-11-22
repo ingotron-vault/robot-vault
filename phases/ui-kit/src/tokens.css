@@ -1,0 +1,69 @@
+/*
+ * Design tokens shared by every Robot Vault SPA.
+ *
+ * :root / .dark blocks below carry the ORIGINAL phase-05 variable values
+ * verbatim (background, foreground, border, muted, accent, radius-lg,
+ * radius-md) so adopting the kit is a zero-visual-change refactor. New
+ * variables added for the kit: --card, --muted-foreground, --accent-foreground,
+ * --success, --warning, --danger, --radius-sm.
+ *
+ * IMPORTANT divergence from the literal "free --muted for subtle fills" idea:
+ * dozens of un-migrated phase-05 page files (Home/Uploads/Explore/Admin/Obs/
+ * Foxglove) still reference --muted
+ * directly via `text-muted` / `bg-muted/10`. Repointing --muted to a new value would
+ * silently re-theme all of those pages, breaking the zero-visual-change
+ * requirement. So for now --muted keeps its current value, and
+ * --muted-foreground is added as a same-valued alias that new kit components
+ * (and the ported PageShell/ThemeToggle) use. Once the remaining pages use kit
+ * components, --muted can get a distinct "subtle fill" value.
+ *
+ * --success-foreground / --warning-foreground / --danger-foreground:
+ * StatusPill/Toast/Chip render `bg-<tone>/10..15` fills with the tone
+ * as the label color (`text-<tone>`), which measures ~1.9-2.6:1 on a 10-15%
+ * tint over --card/--background in the LIGHT theme (worst offender:
+ * --warning at ~1.9:1) — nowhere near WCAG AA's 4.5:1 for text. These three
+ * tokens are per-theme foreground colors (dark, more-saturated hue in light
+ * mode; light, desaturated-toward-white hue in dark mode) tuned to hold
+ * >=4.5:1 against their own tone's 10-15% tint in BOTH themes, so the label
+ * can stay in the tone's hue instead of falling back to plain
+ * --foreground/--muted-foreground. --danger also gets a `.dark` redefinition
+ * (brighter/lighter) because the base hue (0 72% 51%) measures only ~3.4:1 as
+ * a solid dot/border against --card/--background in the dark theme -- legible
+ * but with little margin; --success and --warning already clear 5.6:1+ there
+ * unmodified, so they keep one hue across both themes.
+ */
+
+:root {
+  --background: 210 20% 98%;
+  --foreground: 222 47% 11%;
+  --card: 0 0% 100%;
+  --border: 214 32% 91%;
+  --muted: 215 20% 65%;
+  --muted-foreground: 215 20% 65%;
+  --accent: 221 83% 53%;
+  --accent-foreground: 0 0% 100%;
+  --success: 142 71% 40%;
+  --warning: 38 92% 50%;
+  --danger: 0 72% 51%;
+  --success-foreground: 142 76% 24%;
+  --warning-foreground: 38 95% 26%;
+  --danger-foreground: 0 74% 38%;
+  --radius-lg: 12px;
+  --radius-md: 8px;
+  --radius-sm: 6px;
+}
+
+.dark {
+  --background: 222 47% 11%;
+  --foreground: 210 20% 98%;
+  --card: 222 47% 15%;
+  --border: 217 19% 27%;
+  --muted: 215 20% 65%;
+  --muted-foreground: 215 20% 65%;
+  --accent: 217 91% 60%;
+  --accent-foreground: 0 0% 100%;
+  --danger: 0 84% 63%;
+  --success-foreground: 142 70% 75%;
+  --warning-foreground: 38 95% 75%;
+  --danger-foreground: 0 90% 80%;
+}

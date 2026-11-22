@@ -1,0 +1,84 @@
+rule_files:
+  - release-alerts.yml
+evaluation_interval: 1m
+tests:
+  - interval: 1m
+    input_series:
+      - series: 'robot_vault_volume_available_bytes{volume="object_store"}'
+        values: '4+0x90'
+      - series: 'robot_vault_volume_total_bytes{volume="object_store"}'
+        values: '100+0x90'
+      - series: 'robot_vault_backlog_age_seconds{queue="processing"}'
+        values: '4000+0x90'
+      - series: 'robot_vault_backlog_items{queue="processing"}'
+        values: '2+0x90'
+      - series: 'robot_vault_backup_last_success_timestamp_seconds'
+        values: '0+0x90'
+      - series: 'robot_vault_certificate_expiry_timestamp_seconds{certificate="query"}'
+        values: '604800+0x90'
+      - series: 'robot_vault_operational_collection_success{source="backup"}'
+        values: '0+0x90'
+      - series: 'robot_vault_operational_last_success_timestamp_seconds{source="backup"}'
+        values: '0+0x90'
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: RobotVaultVolumeNearFull
+        exp_alerts:
+          - exp_labels: {volume: object_store, severity: warning}
+            exp_annotations:
+              summary: 'Robot Vault object_store volume has less than 10% free'
+              runbook_url: 'https://github.com/ingotron-vault/robot-vault/blob/main/docs/OPERATIONS.md#disk-and-object-capacity'
+      - eval_time: 20m
+        alertname: RobotVaultVolumeCritical
+        exp_alerts:
+          - exp_labels: {volume: object_store, severity: critical}
+            exp_annotations:
+              summary: 'Robot Vault object_store volume has less than 5% free'
+              runbook_url: 'https://github.com/ingotron-vault/robot-vault/blob/main/docs/OPERATIONS.md#disk-and-object-capacity'
+      - eval_time: 20m
+        alertname: RobotVaultBacklogOld
+        exp_alerts:
+          - exp_labels: {queue: processing, severity: warning}
+            exp_annotations:
+              summary: 'Robot Vault processing backlog has waited over one hour'
+              runbook_url: 'https://github.com/ingotron-vault/robot-vault/blob/main/docs/OPERATIONS.md#backlog-age'
+      - eval_time: 20m
+        alertname: RobotVaultBackupMissing
+        exp_alerts:
+          - exp_labels: {severity: critical}
+            exp_annotations:
+              summary: 'No successful Robot Vault backup has been recorded'
+              runbook_url: 'https://github.com/ingotron-vault/robot-vault/blob/main/docs/OPERATIONS.md#backup-freshness'
+      - eval_time: 20m
+        alertname: RobotVaultOperationalCollectionFailed
+        exp_alerts:
+          - exp_labels: {source: backup, severity: critical}
+            exp_annotations:
+              summary: 'Robot Vault backup operational metrics collection failed'
+              runbook_url: 'https://github.com/ingotron-vault/robot-vault/blob/main/docs/OPERATIONS.md#collection-failure'
+      - eval_time: 20m
+        alertname: RobotVaultOperationalCollectionStale
+        exp_alerts:
+          - exp_labels: {source: backup, severity: critical}
+            exp_annotations:
+              summary: 'Robot Vault backup operational metrics are stale'
+              runbook_url: 'https://github.com/ingotron-vault/robot-vault/blob/main/docs/OPERATIONS.md#collection-failure'
+      - eval_time: 80m
+        alertname: RobotVaultCertificateExpiring
+        exp_alerts:
+          - exp_labels: {certificate: query, severity: warning}
+            exp_annotations:
+              summary: 'Robot Vault query public certificate chain expires within 14 days'
+              runbook_url: 'https://github.com/ingotron-vault/robot-vault/blob/main/docs/OPERATIONS.md#certificate-expiry'
+  - interval: 1m
+    input_series:
+      - series: 'robot_vault_backup_last_success_timestamp_seconds'
+        values: '1+0x1700'
+    alert_rule_test:
+      - eval_time: 28h
+        alertname: RobotVaultBackupStale
+        exp_alerts:
+          - exp_labels: {severity: critical}
+            exp_annotations:
+              summary: 'Robot Vault backup is older than 26 hours'
+              runbook_url: 'https://github.com/ingotron-vault/robot-vault/blob/main/docs/OPERATIONS.md#backup-freshness'
