@@ -1,12 +1,12 @@
 {
   "schema": 1,
-  "version": null,
-  "source_commit": null,
+  "version": "0.11.0",
+  "source_commit": "d6b9544b7f313f6057dd9dd9cb24c3d131c14e91",
   "images": {
-    "robot-vault-toolkit": null,
-    "robot-vault-ingest": null,
-    "robot-vault-core-processor": null,
-    "robot-vault-core-query": null,
-    "robot-vault-objectstore": null
+    "robot-vault-toolkit": "ghcr.io/ingotron-vault/robot-vault-core-toolkit@sha256:7fae76143583a84d0fe6beab2ee1ae66c4aad762ee3b46d1858097a497b023ab",
+    "robot-vault-ingest": "ghcr.io/ingotron-vault/robot-vault-core-ingest@sha256:8e095bd20bd983620b500c18cb303a19c9a3625815af9dbdcc1e93684f6429f1",
+    "robot-vault-core-processor": "ghcr.io/ingotron-vault/robot-vault-core-processor@sha256:edc8872b6c300a0fa3a437c7a7f8aaf0fb2db597cdf1fb49f28f7175ce6d1e19",
+    "robot-vault-core-query": "ghcr.io/ingotron-vault/robot-vault-core-query@sha256:6cd0bd8a5349d4705c416e47de2fec070aa1b233784843845876a53c7972fdef",
+    "robot-vault-objectstore": "ghcr.io/ingotron-vault/robot-vault-core-objectstore@sha256:0e5a00a1125f2517d4f992d973118d7e4b579690c7bc5ffbad58528c38348dab"
   }
 }
