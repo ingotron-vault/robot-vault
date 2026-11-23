@@ -174,3 +174,5 @@ CMD ["sleep", "infinity"]
 
 ARG GIT_SHA=unknown
 LABEL org.opencontainers.image.revision=$GIT_SHA
+ARG RELEASE_SOURCE_URL=https://github.com/ingotron-vault/robot-vault
+LABEL org.opencontainers.image.source=$RELEASE_SOURCE_URL

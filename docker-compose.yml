@@ -284,6 +284,7 @@ services:
       dockerfile: phases/04-processing-pipeline/Dockerfile
       args:
         GIT_SHA: ${GIT_SHA:-unknown}
+        RELEASE_SOURCE_URL: ${RELEASE_SOURCE_URL:-https://github.com/ingotron-vault/robot-vault}
     image: robot-vault-core-processor:latest
     container_name: robot-vault-processor
     working_dir: /app
@@ -310,6 +311,7 @@ services:
       dockerfile: phases/05-query-service/Dockerfile
       args:
         GIT_SHA: ${GIT_SHA:-unknown}
+        RELEASE_SOURCE_URL: ${RELEASE_SOURCE_URL:-https://github.com/ingotron-vault/robot-vault}
     image: robot-vault-core-query:latest
     container_name: robot-vault-query
     working_dir: /app

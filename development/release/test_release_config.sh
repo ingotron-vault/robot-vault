@@ -1647,8 +1647,10 @@ tool = f"{root}/development/release/core_images.py"
 def run(*args):
     return subprocess.run([sys.executable, tool, *args], capture_output=True, text=True,
                           env={"PATH": "/nonexistent"})  # no docker: refusals must come first
-committed = f"{root}/release/core-images.lock.json"
-r = run("pull", "--lock", committed, "--version", "0.0.0")
+committed = json.load(open(f"{root}/release/core-images.lock.json"))
+unfilled = f"{tmp}/unfilled.lock.json"
+json.dump(dict(committed, version=None, source_commit=None, images=dict.fromkeys(committed["images"])), open(unfilled, "w"))
+r = run("pull", "--lock", unfilled, "--version", "0.0.0")
 assert r.returncode == 1 and "is not filled by a release yet" in r.stderr, r.stderr
 good = {"schema": 1, "version": "9.9.9", "source_commit": "a" * 40, "images": {
     n: f"registry.example.invalid/{n}@sha256:" + "b" * 64 for n in

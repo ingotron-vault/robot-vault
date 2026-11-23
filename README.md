@@ -72,7 +72,7 @@ After the install:
 ## Source for every image
 
 Core images are published as `ghcr.io/ingotron-vault/robot-vault-core-ingest`,
-`-processor`, `-query`, and `-toolkit`.
+`-processor`, `-query`, `-toolkit`, and `-objectstore`.
 
 - Each release tag in this repository is the exact source of that release's
   image digests, including the build scripts.

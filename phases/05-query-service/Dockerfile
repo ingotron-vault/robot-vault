@@ -202,4 +202,6 @@ CMD ["uvicorn", "query_service.main:app", "--host", "0.0.0.0", "--port", "8003"]
 # baked DuckDB-extension layers.
 ARG GIT_SHA=unknown
 LABEL org.opencontainers.image.revision=$GIT_SHA
+ARG RELEASE_SOURCE_URL=https://github.com/ingotron-vault/robot-vault
+LABEL org.opencontainers.image.source=$RELEASE_SOURCE_URL
 ENV GIT_SHA=$GIT_SHA
