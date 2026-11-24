@@ -4,7 +4,7 @@ All notable changes to Robot Vault core are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). The project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.11.0] - unreleased
+## [0.11.0] - 2026-11-24
 
 This is the first public release of Robot Vault core. It is licensed under
 the GNU Affero General Public License, version 3 only (AGPL-3.0-only).
